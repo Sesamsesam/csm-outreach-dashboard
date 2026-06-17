@@ -1,0 +1,23 @@
+# Personal data — never commit
+csm_jobs.csv
+seen_job_ids.txt
+cover_letters/*.txt
+cover_letters/*.md
+
+# API keys
+dashboard/.hunter_key
+dashboard/.apollo_key
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# macOS
+.DS_Store
+
+# Temp / unknown files
+ziD6IQFX
+
+# Claude personal settings (keep launch.json but not local permissions)
+.claude/settings.local.json
