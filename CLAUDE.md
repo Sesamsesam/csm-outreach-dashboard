@@ -7,13 +7,25 @@ This is a LinkedIn CSM job outreach tracker with a local web dashboard, two Clau
 Run these steps to get them up and running:
 
 ### 1. Install dependencies
+
+On Mac/Linux:
 ```bash
 pip3 install flask
 ```
+On Windows:
+```bash
+pip install flask
+```
 
 ### 2. Create their CSV data file
+
+On Mac/Linux:
 ```bash
 cp csm_jobs.example.csv csm_jobs.csv
+```
+On Windows:
+```bash
+copy csm_jobs.example.csv csm_jobs.csv
 ```
 This gives them an empty tracker with all the right columns. Their jobs will be added here as they use the skills.
 
@@ -28,8 +40,18 @@ After installing, the user will have two new slash commands available:
 - `/linkedin-csm-enrichment` — enriches an existing job row with contact info from LinkedIn
 
 ### 4. Start the dashboard
+
+On Mac/Linux:
 ```bash
 bash dashboard/run.sh
+```
+On Windows:
+```
+dashboard\run.bat
+```
+Or cross-platform (works everywhere):
+```bash
+python3 dashboard/app.py
 ```
 Then open http://localhost:5000 in a browser.
 
@@ -67,6 +89,8 @@ Then open http://localhost:5000 in a browser.
 
 ## Notes for Claude
 
+- **If the user says "start the dashboard", "open localhost", or similar:** detect their OS, run the appropriate command (`bash dashboard/run.sh` on Mac/Linux, `python3 dashboard/app.py` on Windows), then tell them to open http://localhost:5000.
+- **OS detection:** check `sys.platform` or `os.name` in Python, or look at shell environment. Mac/Linux → use `bash` and `pip3`. Windows → use `python` and `pip`.
 - The dashboard runs on port 5000 by default. If that port is taken, Flask will error — the user can change `PORT = 5000` at the top of `dashboard/app.py`.
 - All data stays local — no cloud sync, no database. Everything is in `csm_jobs.csv`.
 - Hunter.io API key is stored in `dashboard/.hunter_key` after the user enters it in the dashboard UI. You do not need to set it via environment variables.
