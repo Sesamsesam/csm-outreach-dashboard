@@ -1,6 +1,7 @@
 # Personal data — never commit
 csm_jobs.csv
 seen_job_ids.txt
+user_profile.txt
 cover_letters/*.txt
 cover_letters/*.md
 

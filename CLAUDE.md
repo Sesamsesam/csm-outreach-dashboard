@@ -55,7 +55,20 @@ python3 dashboard/app.py
 ```
 Then open http://localhost:5000 in a browser.
 
-### 5. (Optional) Set up Hunter.io for executive email lookup
+### 5. Save their personal details for cover letters
+
+Ask the user for their full name and email address, then write them to `user_profile.txt` in the project root:
+
+```
+Name: [their full name]
+Email: [their email]
+```
+
+This file is gitignored and stays local. The enrichment skill reads it when generating cover letter signatures so it never has to ask again mid-session.
+
+If the user skips this step, the enrichment skill will ask at the time it generates the first cover letter.
+
+### 6. (Optional) Set up Hunter.io for executive email lookup
 - Sign up free at https://hunter.io — the free plan includes 25 domain searches/month
 - In the dashboard, click any job → open the **Hunter.io** sidebar → paste the API key
 - The key saves locally to `dashboard/.hunter_key` (never committed to git)
