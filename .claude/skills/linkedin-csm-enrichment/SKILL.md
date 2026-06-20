@@ -5,6 +5,8 @@ description: Enrich scraped CSM job rows with up to 4 LinkedIn contacts (recruit
 
 # LinkedIn CSM Enrichment Skill
 
+> **FORMATTING RULE - NO EM DASHES:** Never use em dashes (--) anywhere in any output - not in DMs, cover letters, reports, or any other text. Use a regular hyphen (-) instead. This applies to every piece of text this skill generates, without exception.
+
 For each unprocessed row in the CSM jobs CSV, find up to 4 relevant LinkedIn contacts, draft personalized DMs for each, write a formal cover letter, save outputs, and update the CSV. Every strategy in this skill was confirmed working in live LinkedIn testing.
 
 ---

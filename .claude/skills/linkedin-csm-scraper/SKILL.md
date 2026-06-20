@@ -5,7 +5,9 @@ description: Scrape LinkedIn for new Customer Success Manager job postings (US, 
 
 # LinkedIn CSM Job Scraper
 
-Scrapes LinkedIn for Customer Success Manager job postings and appends new entries to a local CSV, deduplicating by Job ID. Every step below reflects what was confirmed working in live testing — follow it exactly for repeatable results.
+> **FORMATTING RULE - NO EM DASHES:** Never use em dashes (--) anywhere in any output - not in reports, summaries, or any other text. Use a regular hyphen (-) instead. This applies to every piece of text this skill generates, without exception.
+
+Scrapes LinkedIn for Customer Success Manager job postings and appends new entries to a local CSV, deduplicating by Job ID. Every step below reflects what was confirmed working in live testing - follow it exactly for repeatable results.
 
 ---
 
