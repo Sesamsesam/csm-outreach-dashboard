@@ -29,14 +29,14 @@ python3 schema.py
 ```
 This creates an empty `csm_jobs.csv` with the correct columns (from `schema.py`). It will not overwrite an existing file. There is no separate template/example CSV to copy.
 
-### 3. Install the skills into Claude Code
-```bash
-claude skills install linkedin-csm-scraper.skill
-claude skills install linkedin-csm-enrichment.skill
-```
-This gives the user two commands:
+### 3. Skills — nothing to install
+The two skills live in `.claude/skills/` and **auto-load** when the project is open in Claude Code. There is no install command (do **not** tell the user to run `claude skills install` — that's not a real command). The user already has:
 - `/linkedin-csm-scraper` — scrapes new LinkedIn postings into `csm_jobs.csv`
 - `/linkedin-csm-enrichment` — enriches any row that hasn't been enriched yet
+
+The `.claude/skills/<name>/` folders are the **source of truth**. The root `*.skill` zips are packaged copies for Cowork/Desktop only, regenerated from the folders via `bash build_skills.sh`. When editing a skill (e.g. retargeting the job title), edit the folder under `.claude/skills/`, then optionally run `build_skills.sh` to refresh the zips.
+
+**Prerequisite to flag:** the skills drive a browser to read LinkedIn, so the user must be **logged into LinkedIn** in the browser Claude controls before scraping or enriching. If a login wall appears, stop and ask them to log in.
 
 ### 4. Start the dashboard
 ```bash
@@ -67,6 +67,15 @@ This file is gitignored. The enrichment skill reads it for cover-letter signatur
 3. If enrichment finds **zero** usable contacts for a job, it **deletes** that row (low-signal company) but keeps the `job_id` in `seen_job_ids.txt` so the scraper won't re-add it.
 4. The **dashboard** reads `csm_jobs.csv` and renders everything visually.
 
+## Scheduling (if the user wants it to run automatically)
+
+The scraper must finish before enrichment starts (enrichment acts on the rows the scraper produced). Enrichment is idempotent and only touches un-enriched rows, so overlap can't corrupt anything — but for a same-day result, scrape first.
+
+- **Preferred — one chained scheduled task.** Create a single daily task whose prompt runs the scraper to completion, then runs enrichment on all un-enriched rows, in the same session. One agent runs them in order, so enrichment can't start until the scrape is done regardless of duration. Example prompt: *"Run /linkedin-csm-scraper to add new jobs to csm_jobs.csv; when it finishes, run /linkedin-csm-enrichment on every row not yet enriched, then summarize."*
+- **Alternative — two tasks ≥2h apart** (e.g. scrape 6am, enrich 8am) if the user prefers separate visible jobs. Works because enrichment is idempotent, but relies on the gap being long enough.
+
+Scheduled runs still need a logged-in LinkedIn session in the browser Claude controls.
+
 ## Retargeting to a different job title
 
 If the user asks to track a different role (not CSM), **engage with them — don't guess.** Each skill's `SKILL.md` has a clearly marked **🎯 CUSTOMIZE** section listing exactly what to change:
@@ -94,11 +103,15 @@ Walk the user through each knob, confirm their preferences, edit the `SKILL.md` 
 ├── seen_job_ids.txt          ← scraper de-dup cache (gitignored)
 ├── user_profile.txt          ← name/email for cover letters (gitignored)
 ├── cover_letters/            ← generated cover letters (gitignored)
+├── .claude/skills/           ← AUTHORITATIVE skills (auto-load in Claude Code)
+│   ├── linkedin-csm-scraper/     (SKILL.md + scripts/append_jobs.py)
+│   └── linkedin-csm-enrichment/  (SKILL.md + scripts/update_contacts.py)
 ├── dashboard/
 │   ├── app.py                ← Flask dashboard (port 5001)
 │   └── run.sh / run.bat      ← launchers
-├── linkedin-csm-scraper.skill
-└── linkedin-csm-enrichment.skill
+├── build_skills.sh           ← regenerates the .skill zips from .claude/skills/
+├── linkedin-csm-scraper.skill       ← packaged copy (Cowork/Desktop only)
+└── linkedin-csm-enrichment.skill    ← packaged copy (Cowork/Desktop only)
 ```
 
 ## CSV columns (defined in schema.py)
