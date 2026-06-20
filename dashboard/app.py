@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 CSM Outreach Dashboard
-Run:  cd /Users/yeti/Claude/Projects/Test/dashboard && python3 app.py
-Then open: http://localhost:5000
+Run:  python3 dashboard/app.py   (from the project root)
+Then open: http://localhost:5001
 """
 
 import csv
@@ -654,10 +654,11 @@ loadHunterCredits();
 # ── routes ─────────────────────────────────────────────────────────────────
 
 # Unified nav tabs: display name → predicate over a job row. Order = left to right.
+_TERMINAL_STATUSES = {"DMs sent", "Replied", "Applied", "Archived"}
 TAB_FILTERS = {
-    "Ready to Send": lambda j: bool(j.get("contact1_name", "").strip())
-                               and (j.get("outreach_status") or "Not started") == "Not started",
-    "Pending Agent": lambda j: not j.get("contact1_name", "").strip(),
+    "Ready to Send": lambda j: any(j.get(f"contact{i}_name", "").strip() for i in range(1, 5))
+                               and (j.get("outreach_status") or "") not in _TERMINAL_STATUSES,
+    "Pending Agent": lambda j: not any(j.get(f"contact{i}_name", "").strip() for i in range(1, 5)),
     "DMs Sent":      lambda j: (j.get("outreach_status") or "") == "DMs sent",
     "Replies":       lambda j: (j.get("outreach_status") or "") == "Replied",
     "Applied":       lambda j: (j.get("outreach_status") or "") == "Applied",
@@ -850,7 +851,7 @@ def hunter_find_execs():
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 5001))
     print(f"\n✅  Dashboard running at http://localhost:{port}")
     print(f"    CSV: {os.path.abspath(CSV_PATH)}\n")
     app.run(debug=False, port=port)

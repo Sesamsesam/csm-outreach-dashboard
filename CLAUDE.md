@@ -1,110 +1,110 @@
-# CSM Outreach Dashboard — Setup Guide for Claude Code
+# CSM Outreach Dashboard — Guide for Claude
 
-This is a LinkedIn CSM job outreach tracker with a local web dashboard, two Claude Code skills for scraping and enriching job data, and optional Hunter.io integration for finding executive emails.
+This is a LinkedIn job-outreach tracker with a local web dashboard, two Claude Code skills (scrape + enrich), and optional Hunter.io email lookup. It ships tuned for **Customer Success Manager** roles but is built to be retargeted to any job title.
+
+## 🔒 The most important rule: ONE data file
+
+There is **exactly one** data file in this project: **`csm_jobs.csv`** in the project root.
+
+- **Never** create a second CSV. Never write job data to any other filename. Never write to a template, backup, or "example" file — there is no example file.
+- The column layout is defined **once** in `schema.py`. Do not invent columns or reorder them. If a column genuinely needs to change, edit `schema.py` and nothing else.
+- Both skills write through helper scripts (`append_jobs.py`, `update_contacts.py`) that **physically refuse** any `--csv` path whose filename isn't `csm_jobs.csv`, and that always preserve the existing header. Always point them at `{project_root}/csm_jobs.csv`.
+- If `csm_jobs.csv` doesn't exist, create it with `python3 schema.py` (or let the scraper create it automatically). Don't hand-roll a CSV.
+
+This single-file discipline is the whole point of the project structure — the scraper, the enrichment skill, and the dashboard all stay in sync because they all bind to this one schema-defined file.
 
 ## When a new user opens this project
 
-Run these steps to get them up and running:
+Run these steps to get them going:
 
 ### 1. Install dependencies
-
-On Mac/Linux:
 ```bash
-pip3 install flask
-```
-On Windows:
-```bash
-pip install flask
+pip3 install flask     # macOS/Linux
+pip install flask      # Windows
 ```
 
-### 2. Create their CSV data file
-
-On Mac/Linux:
+### 2. Create their one data file
 ```bash
-cp csm_jobs.example.csv csm_jobs.csv
+python3 schema.py
 ```
-On Windows:
-```bash
-copy csm_jobs.example.csv csm_jobs.csv
-```
-This gives them an empty tracker with all the right columns. Their jobs will be added here as they use the skills.
+This creates an empty `csm_jobs.csv` with the correct columns (from `schema.py`). It will not overwrite an existing file. There is no separate template/example CSV to copy.
 
 ### 3. Install the skills into Claude Code
-Both `.skill` files in this repo are Claude Code skills. Install them with:
 ```bash
 claude skills install linkedin-csm-scraper.skill
 claude skills install linkedin-csm-enrichment.skill
 ```
-After installing, the user will have two new slash commands available:
-- `/linkedin-csm-scraper` — scrapes a LinkedIn job posting URL into `csm_jobs.csv`
-- `/linkedin-csm-enrichment` — enriches an existing job row with contact info from LinkedIn
+This gives the user two commands:
+- `/linkedin-csm-scraper` — scrapes new LinkedIn postings into `csm_jobs.csv`
+- `/linkedin-csm-enrichment` — enriches any row that hasn't been enriched yet
 
 ### 4. Start the dashboard
-
-On Mac/Linux:
 ```bash
-bash dashboard/run.sh
-```
-On Windows:
-```
-dashboard\run.bat
-```
-Or cross-platform (works everywhere):
-```bash
+bash dashboard/run.sh      # macOS/Linux
+dashboard\run.bat          # Windows
+# or cross-platform:
 python3 dashboard/app.py
 ```
-Then open http://localhost:5000 in a browser.
+Then open **http://localhost:5001**.
 
 ### 5. Save their personal details for cover letters
-
-Ask the user for their full name and email address, then write them to `user_profile.txt` in the project root:
-
+Ask for the user's full name and email, then write `user_profile.txt` in the project root:
 ```
 Name: [their full name]
 Email: [their email]
 ```
+This file is gitignored. The enrichment skill reads it for cover-letter signatures so it never has to ask mid-session. If skipped, the enrichment skill will ask the first time it writes a cover letter.
 
-This file is gitignored and stays local. The enrichment skill reads it when generating cover letter signatures so it never has to ask again mid-session.
+### 6. (Optional) Hunter.io for executive email lookup
+- Sign up free at https://hunter.io (25 domain searches/month on the free plan).
+- In the dashboard, open any job → the **Hunter.io** sidebar → paste the API key.
+- The key saves to `dashboard/.hunter_key` (gitignored).
 
-If the user skips this step, the enrichment skill will ask at the time it generates the first cover letter.
+## How the two skills work together
 
-### 6. (Optional) Set up Hunter.io for executive email lookup
-- Sign up free at https://hunter.io — the free plan includes 25 domain searches/month
-- In the dashboard, click any job → open the **Hunter.io** sidebar → paste the API key
-- The key saves locally to `dashboard/.hunter_key` (never committed to git)
+1. **Scraper** finds new job postings on LinkedIn and **appends** them as new rows to `csm_jobs.csv` (scraper columns filled, enrichment columns blank). It de-dups by `job_id` using `seen_job_ids.txt`.
+2. **Enrichment** scans `csm_jobs.csv` for **any row where all four contact slots are blank** — regardless of `outreach_status` or how long ago it was scraped — and fills in contacts, DMs, and a cover letter. "Enrich anything not yet enriched" is keyed on the data, not the date.
+3. If enrichment finds **zero** usable contacts for a job, it **deletes** that row (low-signal company) but keeps the `job_id` in `seen_job_ids.txt` so the scraper won't re-add it.
+4. The **dashboard** reads `csm_jobs.csv` and renders everything visually.
+
+## Retargeting to a different job title
+
+If the user asks to track a different role (not CSM), **engage with them — don't guess.** Each skill's `SKILL.md` has a clearly marked **🎯 CUSTOMIZE** section listing exactly what to change:
+
+- **Scraper**: search keywords, the title filter, and LinkedIn location/remote/seniority URL params.
+- **Enrichment**: the contact priority tiers, segment-keyword logic, People-tab search terms / function codes, and DM/cover-letter tone.
+
+Walk the user through each knob, confirm their preferences, edit the `SKILL.md` files accordingly, then tell them what changed. The CSV schema, the single-file rule, and the enrich/delete behavior never change — only the search and outreach wording.
+
+## Notes for Claude
+
+- **"Start the dashboard" / "open localhost":** run `bash dashboard/run.sh` (macOS/Linux) or `python dashboard/app.py` (Windows), then tell the user to open http://localhost:5001.
+- **OS detection:** check `sys.platform` / `os.name`. macOS/Linux → `bash` + `pip3`. Windows → `python` + `pip`.
+- **Port:** the dashboard runs on **5001** (macOS reserves 5000 for AirPlay). To change it, set the `PORT` env var or edit the default in `dashboard/app.py`.
+- All data stays local — no cloud, no database. Everything is in `csm_jobs.csv`.
+- The Hunter.io key lives in `dashboard/.hunter_key` after the user enters it in the UI; no environment variable needed.
+- The skills always write to `csm_jobs.csv` in the project root (one level above `dashboard/`).
 
 ## File structure
 
 ```
 .
-├── csm_jobs.csv              ← your personal job data (gitignored, never shared)
-├── csm_jobs.example.csv      ← blank template with headers
+├── schema.py                 ← single source of truth for CSV columns
+├── csm_jobs.csv              ← the ONE data file (gitignored; create via schema.py)
+├── seen_job_ids.txt          ← scraper de-dup cache (gitignored)
+├── user_profile.txt          ← name/email for cover letters (gitignored)
 ├── cover_letters/            ← generated cover letters (gitignored)
 ├── dashboard/
-│   ├── app.py                ← Flask dashboard (single file, all inline)
-│   └── run.sh                ← launcher script
+│   ├── app.py                ← Flask dashboard (port 5001)
+│   └── run.sh / run.bat      ← launchers
 ├── linkedin-csm-scraper.skill
 └── linkedin-csm-enrichment.skill
 ```
 
-## CSV columns
+## CSV columns (defined in schema.py)
 
-| Column | Description |
+| Group | Columns |
 |---|---|
-| job_id | LinkedIn job ID (unique) |
-| date_scraped | When it was added |
-| job_title / company | Role and employer |
-| company_website | Used by Hunter.io for exec search |
-| outreach_status | applied / interviewing / rejected / offer / saved |
-| contact1–4_name/title/linkedin/dm | Up to 4 contacts per job |
-| discovered_execs | JSON array of execs found via Hunter.io |
-| cover_letter_path | Path to the generated cover letter |
-
-## Notes for Claude
-
-- **If the user says "start the dashboard", "open localhost", or similar:** detect their OS, run the appropriate command (`bash dashboard/run.sh` on Mac/Linux, `python3 dashboard/app.py` on Windows), then tell them to open http://localhost:5000.
-- **OS detection:** check `sys.platform` or `os.name` in Python, or look at shell environment. Mac/Linux → use `bash` and `pip3`. Windows → use `python` and `pip`.
-- The dashboard runs on port 5000 by default. If that port is taken, Flask will error — the user can change `PORT = 5000` at the top of `dashboard/app.py`.
-- All data stays local — no cloud sync, no database. Everything is in `csm_jobs.csv`.
-- Hunter.io API key is stored in `dashboard/.hunter_key` after the user enters it in the dashboard UI. You do not need to set it via environment variables.
-- The skills write to `csm_jobs.csv` in the project root (one level above `dashboard/`).
+| Scraper | job_id, date_scraped, job_title, company, company_tagline, industry, hq_location, company_size, job_location, salary, applicant_count, easy_apply, linkedin_job_url, company_linkedin_url, company_website, key_requirements, outreach_status |
+| Enrichment | contact1–4 (name/title/linkedin/dm), cover_letter_path |
+| Dashboard | discovered_execs (JSON array of execs found via Hunter.io) |
