@@ -17,6 +17,10 @@ __pycache__/
 # macOS
 .DS_Store
 
+# Generated skill bundles (the .claude/skills/ folders are authoritative;
+# run build_skills.sh to produce a .skill zip on demand for Cowork/Desktop)
+*.skill
+
 # Temp / unknown files
 ziD6IQFX
 

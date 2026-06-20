@@ -34,7 +34,7 @@ The two skills live in `.claude/skills/` and **auto-load** when the project is o
 - `/linkedin-csm-scraper` — scrapes new LinkedIn postings into `csm_jobs.csv`
 - `/linkedin-csm-enrichment` — enriches any row that hasn't been enriched yet
 
-The `.claude/skills/<name>/` folders are the **source of truth**. The root `*.skill` zips are packaged copies for Cowork/Desktop only, regenerated from the folders via `bash build_skills.sh`. When editing a skill (e.g. retargeting the job title), edit the folder under `.claude/skills/`, then optionally run `build_skills.sh` to refresh the zips.
+The `.claude/skills/<name>/` folders are the **single source of truth** (the Agent Skills open standard — portable across tools). The repo does **not** ship `.skill` zips; they're gitignored. `build_skills.sh` generates one on demand only if the user wants a Cowork/Desktop "Save skill" bundle. When editing a skill (e.g. retargeting the job title), edit the folder under `.claude/skills/` — that's the only copy.
 
 **Prerequisite to flag:** the skills drive a browser to read LinkedIn, so the user must be **logged into LinkedIn** in the browser Claude controls before scraping or enriching. If a login wall appears, stop and ask them to log in.
 
@@ -109,9 +109,7 @@ Walk the user through each knob, confirm their preferences, edit the `SKILL.md` 
 ├── dashboard/
 │   ├── app.py                ← Flask dashboard (port 5001)
 │   └── run.sh / run.bat      ← launchers
-├── build_skills.sh           ← regenerates the .skill zips from .claude/skills/
-├── linkedin-csm-scraper.skill       ← packaged copy (Cowork/Desktop only)
-└── linkedin-csm-enrichment.skill    ← packaged copy (Cowork/Desktop only)
+└── build_skills.sh           ← optional: generate a .skill bundle for Cowork/Desktop (gitignored)
 ```
 
 ## CSV columns (defined in schema.py)

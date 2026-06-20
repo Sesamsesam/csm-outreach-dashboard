@@ -44,7 +44,9 @@ There is **exactly one data file: `csm_jobs.csv`.** The scraper appends new rows
 
 There is **nothing to install for the skills.** They live in `.claude/skills/` inside this repo, which Claude Code discovers automatically the moment you open the project. After cloning, the commands `/linkedin-csm-scraper` and `/linkedin-csm-enrichment` are simply available.
 
-> The `*.skill` files in the repo root are *packaged copies* of those same folders, for users on Claude Desktop / Cowork who install via the "Save skill" button. The folders under `.claude/skills/` are the source of truth; the zips are regenerated from them with `bash build_skills.sh`. You never need the zips when using Claude Code.
+> This folder layout (`SKILL.md` + a `scripts/` folder) is the [Agent Skills](https://agentskills.io) open standard — plain, readable files that work across AI coding tools, not a Claude-only format. Another agent (Cursor, etc.) handed this repo can read the same files and set things up its own way.
+>
+> If you specifically want a single-file `.skill` bundle to install via the "Save skill" button in Claude Desktop / Cowork, run `bash build_skills.sh` to generate one on demand. Those bundles are gitignored, not committed — the `.claude/skills/` folders are the one source of truth.
 
 ## Quick start (with Claude Code)
 
@@ -109,7 +111,7 @@ Claude will walk you through the handful of knobs that need to change and confir
 
 The CSV schema, the de-duplication, the "enrich anything not yet enriched" behavior, and the single-data-file rule **stay the same** — only the search and outreach wording changes. Each skill has a clearly marked **🎯 CUSTOMIZE** section at the top documenting exactly what to edit, so the change is safe and contained.
 
-Edits go in the authoritative copy under `.claude/skills/<skill-name>/SKILL.md`. If you also want to refresh the packaged `*.skill` bundles (only needed for Cowork/Desktop sharing), run `bash build_skills.sh` afterward.
+Edits go in `.claude/skills/<skill-name>/SKILL.md` — the one place each skill lives. (If you later want a `.skill` bundle for Cowork/Desktop sharing, run `bash build_skills.sh` to generate one; it's gitignored.)
 
 ## Hunter.io (optional)
 
@@ -136,7 +138,5 @@ Your data never goes to GitHub. The `.gitignore` excludes `csm_jobs.csv`, `seen_
 │   ├── app.py                ← Flask dashboard (port 5001)
 │   ├── run.sh / run.bat      ← launchers
 │   └── .hunter_key           ← Hunter.io API key (gitignored)
-├── build_skills.sh           ← regenerates the .skill bundles from .claude/skills/
-├── linkedin-csm-scraper.skill      ← packaged copy (Cowork/Desktop only)
-└── linkedin-csm-enrichment.skill   ← packaged copy (Cowork/Desktop only)
+└── build_skills.sh           ← optional: generate a .skill bundle for Cowork/Desktop (gitignored)
 ```
