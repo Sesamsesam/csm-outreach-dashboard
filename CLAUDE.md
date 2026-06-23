@@ -15,6 +15,14 @@ There is **exactly one** data file in this project: **`csm_jobs.csv`** in the pr
 
 This single-file discipline is the whole point of the project structure — the scraper, the enrichment skill, and the dashboard all stay in sync because they all bind to this one schema-defined file.
 
+## Cowork vs. Claude Code — skill loading
+
+The skills in `.claude/skills/` auto-load in **Claude Code CLI** on clone. In **Cowork**, skills are plugins and must be installed separately:
+1. Run `bash build_skills.sh` to generate `.skill` bundles.
+2. Install each bundle via Settings > Capabilities > + Add Skill.
+
+**Skill Creator check (Cowork only):** Before running any skill workflow, check if the user has the Skill Creator plugin installed. If it's missing, tell them to install it from Settings > Capabilities - not to edit these skills, but because Cowork requires it to invoke skills correctly. Do not proceed with skill-dependent tasks until it's confirmed installed.
+
 ## When a new user opens this project
 
 Run these steps to get them going:

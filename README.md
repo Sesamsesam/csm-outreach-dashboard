@@ -40,13 +40,36 @@ There is **exactly one data file: `csm_jobs.csv`.** The scraper appends new rows
 - **Browser automation + a logged-in LinkedIn session.** The scraper and enrichment skills drive a web browser to read LinkedIn (job pages, company pages, the People tab). Before running them, open the browser Claude controls and **log into LinkedIn** — otherwise you'll hit a login wall and the skills will stop and tell you to log in.
 - **Python 3** and **Flask** (one `pip` install, below) for the dashboard.
 
-## The skills install themselves
+## The skills — how they load (Claude Code vs. Cowork)
 
-There is **nothing to install for the skills.** They live in `.claude/skills/` inside this repo, which Claude Code discovers automatically the moment you open the project. After cloning, the commands `/linkedin-csm-scraper` and `/linkedin-csm-enrichment` are simply available.
+The two skills exist in `.claude/skills/` in this repo. How they reach your AI tool depends on which one you're using.
 
-> This folder layout (`SKILL.md` + a `scripts/` folder) is the [Agent Skills](https://agentskills.io) open standard — plain, readable files that work across AI coding tools, not a Claude-only format. Another agent (Cursor, etc.) handed this repo can read the same files and set things up its own way.
->
-> If you specifically want a single-file `.skill` bundle to install via the "Save skill" button in Claude Desktop / Cowork, run `bash build_skills.sh` to generate one on demand. Those bundles are gitignored, not committed — the `.claude/skills/` folders are the one source of truth.
+### Claude Code (CLI)
+
+Nothing to install. Claude Code discovers `.claude/skills/` automatically when you open the project folder. After cloning, `/linkedin-csm-scraper` and `/linkedin-csm-enrichment` are immediately available.
+
+### Cowork (Claude Desktop)
+
+Skills in Cowork are installed as plugins — the `.claude/skills/` folder alone isn't enough. After cloning:
+
+```bash
+# 1. Build the .skill bundles from the skill folders
+bash build_skills.sh
+# → generates linkedin-csm-scraper.skill and linkedin-csm-enrichment.skill
+
+# 2. Install each one in Cowork:
+#    Settings > Capabilities > + Add Skill → select the .skill file
+```
+
+Do this for both `.skill` files. Once installed, the skills appear in Cowork and behave identically to the Claude Code versions.
+
+> The `.skill` bundles are gitignored — they're generated output, not source. The source of truth is always `.claude/skills/<name>/SKILL.md`. If you customize a skill, edit the folder first, then re-run `build_skills.sh` to refresh the bundle.
+
+### Skill Creator plugin (Cowork only)
+
+**If you're on Cowork, the agent will check whether you have the Skill Creator plugin installed.** If you don't, it will prompt you to install it — not to modify these skills, but because Cowork needs it available to invoke and manage skills correctly. Install it via Settings > Capabilities if prompted.
+
+> This folder layout (`SKILL.md` + a `scripts/` folder) is the [Agent Skills](https://agentskills.io) open standard — plain, readable files that work across AI coding tools, not a Claude-only format.
 
 ## Quick start (with Claude Code)
 
