@@ -80,5 +80,5 @@
     "zero_contact_behavior": "delete"
   },
 
-  "custom_fields_added": ["work_authorization"]
+  "custom_fields_added": ["work_authorization", "hard_requirements", "years_experience"]
 }

@@ -33,7 +33,7 @@ _FALLBACK_CANONICAL = [
     "hq_location", "company_size", "job_location", "salary", "work_authorization",
     "applicant_count",
     "easy_apply", "linkedin_job_url", "company_linkedin_url", "company_website",
-    "key_requirements", "outreach_status",
+    "key_requirements", "hard_requirements", "years_experience", "outreach_status",
     "contact1_name", "contact1_title", "contact1_linkedin", "contact1_dm",
     "contact2_name", "contact2_title", "contact2_linkedin", "contact2_dm",
     "contact3_name", "contact3_title", "contact3_linkedin", "contact3_dm",

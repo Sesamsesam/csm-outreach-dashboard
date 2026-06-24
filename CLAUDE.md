@@ -290,6 +290,6 @@ Two things that never change when retargeting:
 
 | Group | Columns |
 |---|---|
-| Scraper | job_id, date_scraped, job_title, company, company_tagline, industry, hq_location, company_size, job_location, salary, work_authorization, applicant_count, easy_apply, linkedin_job_url, company_linkedin_url, company_website, key_requirements, outreach_status |
+| Scraper | job_id, date_scraped, job_title, company, company_tagline, industry, hq_location, company_size, job_location, salary, work_authorization, applicant_count, easy_apply, linkedin_job_url, company_linkedin_url, company_website, key_requirements, hard_requirements, years_experience, outreach_status |
 | Enrichment | contact1–4 (name/title/linkedin/dm), cover_letter_path |
 | Dashboard | discovered_execs (JSON array of execs found via Hunter.io) |

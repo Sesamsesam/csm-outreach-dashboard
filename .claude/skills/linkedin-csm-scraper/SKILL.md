@@ -190,6 +190,8 @@ Parse from the `get_page_text` article output:
 | `linkedin_job_url` | `https://www.linkedin.com/jobs/view/{job_id}/` |
 | `date_scraped` | Today's date in YYYY-MM-DD format |
 | `key_requirements` | 1–2 sentence summary of the "What you'll bring" or "Qualifications" section |
+| `hard_requirements` | The **documentation-gated must-haves only** - things an applicant cannot bend their background to satisfy because they would have to *produce proof*: a specific degree/field (e.g. "Bachelor's in Engineering"), a professional license or certification (e.g. "Active RN license", "CPA", "PMP"), a security clearance, bar admission, or legal credential. Write **at most 3** short bullets, separated by `; ` (semicolon-space). Exclude soft/bendable items - years of experience, "preferred", "nice to have", tool familiarity, soft skills. If the posting lists none, leave blank. |
+| `years_experience` | The required years of experience as a short phrase if stated (e.g. "4+ years", "5-7 years"); leave blank if not stated. This is captured separately because it is **not** a hard requirement - it is shown for context, not as a disqualifier. |
 
 For `easy_apply`, run:
 ```javascript

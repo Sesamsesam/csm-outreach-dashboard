@@ -569,6 +569,25 @@ JOB_HTML = BASE_HTML.replace("{% block content %}{% endblock %}", """
       </div>
     </div>
 
+    <!-- Hard requirements (must-haves an applicant cannot bend, e.g. a specific degree, license, clearance) -->
+    {% if job.hard_requirements or job.years_experience %}
+    <div class="sidebar-card mb-3">
+      <div class="sidebar-label mb-2">Hard Requirements</div>
+      {% if job.years_experience %}
+      <div class="mb-2" style="font-size:.82rem;color:#1a1a2e">
+        <i class="bi bi-clock-history me-1" style="color:var(--ink-faint)"></i>{{ job.years_experience }}
+      </div>
+      {% endif %}
+      {% if job.hard_requirements %}
+      <ul style="margin:0;padding-left:1.05rem;font-size:.82rem;color:#1a1a2e;line-height:1.45">
+        {% for r in job.hard_requirements.split(';') %}{% if r.strip() %}<li>{{ r.strip() }}</li>{% endif %}{% endfor %}
+      </ul>
+      {% else %}
+      <div class="text-muted" style="font-size:.8rem;font-style:italic">No documentation-gated requirements flagged.</div>
+      {% endif %}
+    </div>
+    {% endif %}
+
     <!-- Status -->
     <div class="sidebar-card">
       <div class="sidebar-label mb-2">Outreach Status</div>
