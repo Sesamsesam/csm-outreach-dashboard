@@ -24,6 +24,8 @@ This project is built to live in a single folder that **both Claude Code and Cow
 
 The `.claude/skills/<name>/` folders are the **single source of truth**. The plugin in `dist/` is a thin wrapper — it does not duplicate skill logic.
 
+> **Do NOT "rebuild" the plugin into a full-content copy of the skills.** The plugin SKILL.md files are intentionally short launchers; their brevity is by design, not staleness. They read the project's live `SKILL.md` at runtime, so they are always current - including every knob/config change and skill edit - and **never need rebuilding**. Knob changes (retargeting) live in `search_config.json`, which the project's skills load live, so a knob change is reflected in the plugin with no rebuild and no reinstall. Bundling the full skill text would re-introduce drift and break the project-folder discovery the launchers rely on (the run would lose track of the shared `csm_jobs.csv`). The only time `build_plugin.py` is re-run is if the launcher *shape* itself (Step 0/Step 1 wording or `plugin.json`) changes.
+
 ## "Set this up" trigger
 
 If the user says anything like "set this up", "get me started", "initialize this", or "install this" — run the setup steps below in order. This is the intended onboarding phrase for new users in Cowork.
