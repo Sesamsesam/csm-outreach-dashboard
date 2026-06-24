@@ -19,7 +19,7 @@ There is **exactly one** data file in this project: **`{project_root}/csm_jobs.c
 
 ## Configuration
 
-- **Project root**: The current working directory when this skill runs (i.e. `os.getcwd()` / `$PWD`). All paths below are relative to this.
+- **Project root**: The folder this skill lives in, **auto-located by the helper script** — it walks up from its own location (`.claude/skills/.../scripts/`) to find the project root (the folder containing `schema.py`). You do **not** need to compute or pass the project path; it works no matter what the current working directory is (important for scheduled runs). All paths below resolve against that auto-located root.
 - **Master CSV path** (the only data file): `{project_root}/csm_jobs.csv`
 - **Schema (column definitions)**: `{project_root}/schema.py`
 - **Cache path**: `{project_root}/seen_job_ids.txt`
@@ -228,12 +228,11 @@ After processing all qualifying jobs from the current page, move to the next pag
 After all pages are processed, build a JSON array of every job object collected. Run:
 
 ```bash
-python "/path/to/skill/scripts/append_jobs.py" \
-  --csv "{project_root}/csm_jobs.csv" \
+python "<this skill's dir>/scripts/append_jobs.py" \
   --jobs '<json_array>'
 ```
 
-Replace `{project_root}` with the absolute path of the current working directory, and use the actual absolute path to `scripts/append_jobs.py` inside this skill's directory. The `--csv` argument must always point at `{project_root}/csm_jobs.csv` — the script **refuses** any other filename. The script:
+Use the actual absolute path to `scripts/append_jobs.py` inside this skill's directory. **You do not need to pass `--csv`** — the script auto-locates `csm_jobs.csv` in the project root from its own location, so it works regardless of the current working directory (this is what makes scheduled runs reliable). Only pass `--csv` if you deliberately need to override the target, and even then the filename must be `csm_jobs.csv` — the script **refuses** any other filename. The script:
 - Refuses to run if `--csv` isn't the master `csm_jobs.csv` (single-file guardrail)
 - Creates the master `csm_jobs.csv` with the full canonical header (from `schema.py`) if it doesn't exist yet
 - Loads `{project_root}/seen_job_ids.txt` and pre-filters any IDs already there

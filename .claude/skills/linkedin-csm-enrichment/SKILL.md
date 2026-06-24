@@ -19,7 +19,7 @@ There is **exactly one** data file in this project: **`{project_root}/csm_jobs.c
 
 ## Configuration
 
-- **Project root**: The current working directory when this skill runs (i.e. `os.getcwd()` / `$PWD`). All paths below are relative to this.
+- **Project root**: The folder this skill lives in, **auto-located by the helper script** — it walks up from its own location (`.claude/skills/.../scripts/`) to find the project root (the folder containing `schema.py`). You do **not** need to compute or pass the project path; it works no matter what the current working directory is (important for scheduled runs). All paths below resolve against that auto-located root.
 - **Master CSV path** (the only data file): `{project_root}/csm_jobs.csv`
 - **Schema (column definitions)**: `{project_root}/schema.py`
 - **Cover letters dir**: `{project_root}/cover_letters/`
@@ -248,6 +248,12 @@ Where `{company_slug}` = company name lowercased with spaces replaced by undersc
 4. **What you bring**: Brief forward-looking paragraph on how you'd contribute.
 5. **Closing**: Formal close, express enthusiasm for next steps.
 
+To get `{project_root}` reliably (without depending on the current working directory), run once:
+```bash
+python "<this skill's dir>/scripts/update_contacts.py" --print-root
+```
+Use the path it prints as `{project_root}` for the cover-letter file and `user_profile.txt` below.
+
 Before writing the first cover letter, check for `{project_root}/user_profile.txt`. If it exists, read the user's name and email from it (format: `Name: ...` / `Email: ...`). If the file doesn't exist, ask the user for their name and email now, then write the file so future sessions don't need to ask again. Use name and email in the closing signature.
 
 **Tone**: Professional and warm, not robotic. Avoid buzzword soup. It should sound like a real person who did their research.
@@ -261,8 +267,7 @@ Create the `{project_root}/cover_letters/` directory if it doesn't exist.
 After processing each job, run the update script:
 
 ```bash
-python "/path/to/skill/scripts/update_contacts.py" \
-  --csv "{project_root}/csm_jobs.csv" \
+python "<this skill's dir>/scripts/update_contacts.py" \
   --job_id "{job_id}" \
   --data '{
     "contact1_name": "...",
@@ -285,13 +290,12 @@ python "/path/to/skill/scripts/update_contacts.py" \
   }'
 ```
 
-Replace `{project_root}` with the absolute path of the current working directory. Use the actual absolute path to `scripts/update_contacts.py` inside this skill's directory. The `--csv` argument must always be `{project_root}/csm_jobs.csv` — the script refuses any other filename. Leave blank any contact fields where no person was found (but at least Contact 1 should be filled — see the zero-contact rule).
+Use the actual absolute path to `scripts/update_contacts.py` inside this skill's directory. **You do not need to pass `--csv`** — the script auto-locates `csm_jobs.csv` in the project root from its own location, so it works regardless of the current working directory. For `cover_letter_path`, use the `{project_root}` you obtained via `--print-root` above. Leave blank any contact fields where no person was found (but at least Contact 1 should be filled — see the zero-contact rule).
 
 **If zero contacts were found for a job**, do not run the update command above. Instead delete the row:
 
 ```bash
-python "/path/to/skill/scripts/update_contacts.py" \
-  --csv "{project_root}/csm_jobs.csv" \
+python "<this skill's dir>/scripts/update_contacts.py" \
   --job_id "{job_id}" \
   --delete
 ```

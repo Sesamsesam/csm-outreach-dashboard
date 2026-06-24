@@ -36,6 +36,30 @@ _FALLBACK_ENRICHMENT = [
 ]
 
 
+def find_project_root() -> str:
+    """Locate the project root deterministically, independent of the CWD.
+
+    This script lives at <root>/.claude/skills/<skill>/scripts/update_contacts.py,
+    so the project root is four directories up. We confirm by checking for
+    schema.py (the project marker), then walk upward as a fallback, and finally
+    fall back to the CWD. This lets a scheduled task enrich correctly even when
+    its working directory isn't the project folder.
+    """
+    here = os.path.dirname(os.path.abspath(__file__))
+    candidate = os.path.abspath(os.path.join(here, "..", "..", "..", ".."))
+    if os.path.exists(os.path.join(candidate, "schema.py")):
+        return candidate
+    d = here
+    for _ in range(6):
+        if os.path.exists(os.path.join(d, "schema.py")):
+            return d
+        parent = os.path.dirname(d)
+        if parent == d:
+            break
+        d = parent
+    return os.getcwd()
+
+
 def load_schema(csv_path: str):
     """Load schema.py next to the master CSV; fall back to embedded constants."""
     schema_path = os.path.join(os.path.dirname(os.path.abspath(csv_path)), "schema.py")
@@ -61,12 +85,23 @@ def load_schema(csv_path: str):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--csv", required=True, help="Path to the master csm_jobs.csv")
-    parser.add_argument("--job_id", required=True, help="Job ID of the row to update/delete")
+    parser.add_argument("--csv", default=os.path.join(find_project_root(), "csm_jobs.csv"),
+                        help="Path to the master csm_jobs.csv (default: auto-located project root)")
+    parser.add_argument("--job_id", help="Job ID of the row to update/delete")
     parser.add_argument("--data", help="JSON object of enrichment fields to update")
     parser.add_argument("--delete", action="store_true",
                         help="Delete this row (use when zero contacts were found).")
+    parser.add_argument("--print-root", action="store_true",
+                        help="Print the auto-located project root and exit.")
     args = parser.parse_args()
+
+    if args.print_root:
+        print(find_project_root())
+        return
+
+    if not args.job_id:
+        print("Error: --job_id is required (unless --print-root)", file=sys.stderr)
+        sys.exit(1)
 
     schema = load_schema(args.csv)
     schema.assert_master_path(args.csv)

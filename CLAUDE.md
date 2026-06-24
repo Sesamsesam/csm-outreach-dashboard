@@ -15,19 +15,41 @@ There is **exactly one** data file in this project: **`csm_jobs.csv`** in the pr
 
 This single-file discipline is the whole point of the project structure — the scraper, the enrichment skill, and the dashboard all stay in sync because they all bind to this one schema-defined file.
 
-## Cowork vs. Claude Code — skill loading
+## How this project is used: Claude Code + Cowork share ONE folder
 
-The skills in `.claude/skills/` auto-load in **Claude Code CLI** on clone. In **Cowork**, skills are plugins and must be installed separately:
-1. Run `bash build_skills.sh` to generate `.skill` bundles.
-2. Install each bundle via Settings > Capabilities > + Add Skill.
+This project is built to live in a single folder that **both Claude Code and Cowork can see**, so there's one project, one `csm_jobs.csv`, and one set of skills no matter which tool touches it.
 
-**Skill Creator check (Cowork only):** Before running any skill workflow, check if the user has the Skill Creator plugin installed. If it's missing, tell them to install it from Settings > Capabilities - not to edit these skills, but because Cowork requires it to invoke skills correctly. Do not proceed with skill-dependent tasks until it's confirmed installed.
+- **Claude Code** does the one-time setup (cloning, installing Flask, creating the CSV) and the on-demand work ("run my daily job search", "open the dashboard"). It auto-loads the skills from `.claude/skills/` whenever the project folder is open.
+- **Cowork** can run the recurring **scheduled scrape** locally (it drives the user's logged-in browser and writes to the same `csm_jobs.csv`). Cowork does not auto-load `.claude/skills/`, but it doesn't need a separate skill install either — a scheduled task simply **references the skill files by path**, e.g. *"follow the steps in `.claude/skills/linkedin-csm-scraper/SKILL.md` to add new jobs to `csm_jobs.csv`."* Because the folder is shared, Cowork reads the same authoritative `SKILL.md` Claude Code uses.
+
+The `.claude/skills/<name>/` folders are the **single source of truth**. There are no `.skill` bundles to build and no Skill Creator plugin to install — ignore any older instructions that mention them.
 
 ## When a new user opens this project
 
 Run these steps **in order** to get them going. The user may be non-technical — do not tell them to open a terminal or run commands themselves. Run everything yourself. Only tell the user something if you need them to take a physical action (like clicking a button in a dialog).
 
-### 0. Check prerequisites (run these checks silently — install what's missing)
+### 0. Confirm the install location (so Cowork and Claude Code share it)
+
+For the shared-folder setup to work, this project should live inside the user's **Cowork files location**, under `Projects/`. That location is user-configurable, so **discover it — never hardcode it.**
+
+Read the Cowork desktop config and parse the `coworkUserFilesPath` value:
+- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+
+```bash
+# macOS example — extract the configured Cowork files path
+python3 -c "import json,os; p=os.path.expanduser('~/Library/Application Support/Claude/claude_desktop_config.json'); print(json.load(open(p)).get('coworkUserFilesPath',''))" 2>/dev/null
+```
+
+Then:
+- **Ideal location** = `<coworkUserFilesPath>/Projects/csm-outreach-dashboard`.
+- **If this project folder is already at that path** → nothing to do, continue.
+- **If it's somewhere else and `coworkUserFilesPath` exists** → tell the user you'd like to move it so Cowork can see it too, and (with their OK) relocate the folder there, then continue from the new location.
+- **If the config or key doesn't exist** (Cowork not installed, or a Claude Code-only user) → the current location is fine; continue.
+
+> If you're cloning fresh, clone directly into `<coworkUserFilesPath>/Projects/csm-outreach-dashboard` so this step is already satisfied.
+
+### 1. Check prerequisites (run these checks silently — install what's missing)
 
 First, detect the OS:
 ```bash
@@ -107,24 +129,24 @@ If MISSING: run `pip install flask`.
 
 ---
 
-Only after ALL prerequisites for the detected OS pass, continue to step 1.
+Only after ALL prerequisites for the detected OS pass, continue to step 2.
 
-### 1. Create their one data file
+### 2. Create their one data file
 ```bash
 python3 schema.py
 ```
 This creates an empty `csm_jobs.csv` with the correct columns (from `schema.py`). It will not overwrite an existing file. There is no separate template/example CSV to copy.
 
-### 2. Skills — nothing to install
+### 3. Skills — nothing to install
 The two skills live in `.claude/skills/` and **auto-load** when the project is open in Claude Code. There is no install command (do **not** tell the user to run `claude skills install` — that's not a real command). The user already has:
 - `/linkedin-csm-scraper` — scrapes new LinkedIn postings into `csm_jobs.csv`
 - `/linkedin-csm-enrichment` — enriches any row that hasn't been enriched yet
 
-The `.claude/skills/<name>/` folders are the **single source of truth** (the Agent Skills open standard — portable across tools). The repo does **not** ship `.skill` zips; they're gitignored. `build_skills.sh` generates one on demand only if the user wants a Cowork/Desktop "Save skill" bundle. When editing a skill (e.g. retargeting the job title), edit the folder under `.claude/skills/` — that's the only copy.
+The `.claude/skills/<name>/` folders are the **single source of truth**. When editing a skill (e.g. retargeting the job title), edit the folder under `.claude/skills/` — that's the only copy. (For Cowork's scheduled scrape, a task just references these same files by path; nothing extra to install.)
 
 **Prerequisite to flag:** the skills drive a browser to read LinkedIn, so the user must be **logged into LinkedIn** in the browser Claude controls before scraping or enriching. If a login wall appears, stop and ask them to log in.
 
-### 3. Start the dashboard
+### 4. Start the dashboard
 ```bash
 bash dashboard/run.sh      # macOS/Linux
 dashboard\run.bat          # Windows
@@ -133,7 +155,7 @@ python3 dashboard/app.py
 ```
 Then tell the user to open **http://localhost:5001** in their browser.
 
-### 4. Save their personal details for cover letters
+### 5. Save their personal details for cover letters
 Ask for the user's full name and email, then write `user_profile.txt` in the project root:
 ```
 Name: [their full name]
@@ -141,7 +163,7 @@ Email: [their email]
 ```
 This file is gitignored. The enrichment skill reads it for cover-letter signatures so it never has to ask mid-session. If skipped, the enrichment skill will ask the first time it writes a cover letter.
 
-### 5. (Optional) Hunter.io for executive email lookup
+### 6. (Optional) Hunter.io for executive email lookup
 - Sign up free at https://hunter.io (25 domain searches/month on the free plan).
 - In the dashboard, open any job → the **Hunter.io** sidebar → paste the API key.
 - The key saves to `dashboard/.hunter_key` (gitignored).
@@ -153,14 +175,16 @@ This file is gitignored. The enrichment skill reads it for cover-letter signatur
 3. If enrichment finds **zero** usable contacts for a job, it **deletes** that row (low-signal company) but keeps the `job_id` in `seen_job_ids.txt` so the scraper won't re-add it.
 4. The **dashboard** reads `csm_jobs.csv` and renders everything visually.
 
-## Scheduling (if the user wants it to run automatically)
+## Scheduling (the daily automated scrape)
 
-The scraper must finish before enrichment starts (enrichment acts on the rows the scraper produced). Enrichment is idempotent and only touches un-enriched rows, so overlap can't corrupt anything — but for a same-day result, scrape first.
+A scheduled scrape needs to drive a **logged-in LinkedIn browser** and write to the **local** `csm_jobs.csv`. That means it must run **on the user's machine**, not as a cloud agent. Two ways to set it up:
 
-- **Preferred — one chained scheduled task.** Create a single daily task whose prompt runs the scraper to completion, then runs enrichment on all un-enriched rows, in the same session. One agent runs them in order, so enrichment can't start until the scrape is done regardless of duration. Example prompt: *"Run /linkedin-csm-scraper to add new jobs to csm_jobs.csv; when it finishes, run /linkedin-csm-enrichment on every row not yet enriched, then summarize."*
-- **Alternative — two tasks ≥2h apart** (e.g. scrape 6am, enrich 8am) if the user prefers separate visible jobs. Works because enrichment is idempotent, but relies on the gap being long enough.
+- **Cowork scheduled task (runs locally).** Because the project lives in the shared Cowork files folder, a Cowork scheduled task can open this project, scrape, and write the same `csm_jobs.csv`. The task prompt should reference the skill files by path, e.g.: *"Open the project at `<coworkUserFilesPath>/Projects/csm-outreach-dashboard`. Follow `.claude/skills/linkedin-csm-scraper/SKILL.md` to add new jobs to `csm_jobs.csv`. When that finishes, follow `.claude/skills/linkedin-csm-enrichment/SKILL.md` to enrich every row not yet enriched. Then give a short combined summary."*
+- **On-demand in Claude Code.** The simplest reliable flow: the user opens the project and says *"run my daily job search"* — the agent runs scrape → enrich in one session.
 
-Scheduled runs still need a logged-in LinkedIn session in the browser Claude controls.
+**Ordering:** the scraper must finish before enrichment starts (enrichment acts on the rows the scraper produced). A single chained task guarantees this. Enrichment is idempotent and only touches un-enriched rows, so a missed straggler is just caught next run.
+
+**Always required:** a scheduled run still needs a **logged-in LinkedIn session** in the browser Claude controls, the machine **awake**, and someone available if LinkedIn throws a login wall or CAPTCHA (the skills stop and ask in that case).
 
 ## Retargeting to a different job title
 
@@ -192,10 +216,9 @@ Walk the user through each knob, confirm their preferences, edit the `SKILL.md` 
 ├── .claude/skills/           ← AUTHORITATIVE skills (auto-load in Claude Code)
 │   ├── linkedin-csm-scraper/     (SKILL.md + scripts/append_jobs.py)
 │   └── linkedin-csm-enrichment/  (SKILL.md + scripts/update_contacts.py)
-├── dashboard/
-│   ├── app.py                ← Flask dashboard (port 5001)
-│   └── run.sh / run.bat      ← launchers
-└── build_skills.sh           ← optional: generate a .skill bundle for Cowork/Desktop (gitignored)
+└── dashboard/
+    ├── app.py                ← Flask dashboard (port 5001)
+    └── run.sh / run.bat      ← launchers
 ```
 
 ## CSV columns (defined in schema.py)

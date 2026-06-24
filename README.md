@@ -40,44 +40,24 @@ There is **exactly one data file: `csm_jobs.csv`.** The scraper appends new rows
 - **Browser automation + a logged-in LinkedIn session.** The scraper and enrichment skills drive a web browser to read LinkedIn (job pages, company pages, the People tab). Before running them, open the browser Claude controls and **log into LinkedIn** — otherwise you'll hit a login wall and the skills will stop and tell you to log in.
 - **Python 3** and **Flask** (one `pip` install, below) for the dashboard.
 
-## The skills — how they load (Claude Code vs. Cowork)
+## The skills — how they load
 
-The two skills exist in `.claude/skills/` in this repo. How they reach your AI tool depends on which one you're using.
+The two skills live in `.claude/skills/` in this repo, and that folder is the single source of truth.
 
-### Claude Code (CLI)
+**Claude Code** discovers `.claude/skills/` automatically when you open the project folder — nothing to install. After setup, `/linkedin-csm-scraper` and `/linkedin-csm-enrichment` are immediately available.
 
-Nothing to install. Claude Code discovers `.claude/skills/` automatically when you open the project folder. After cloning, `/linkedin-csm-scraper` and `/linkedin-csm-enrichment` are immediately available.
-
-### Cowork (Claude Desktop)
-
-Skills in Cowork are installed as plugins — the `.claude/skills/` folder alone isn't enough. After cloning:
-
-```bash
-# 1. Build the .skill bundles from the skill folders
-bash build_skills.sh
-# → generates linkedin-csm-scraper.skill and linkedin-csm-enrichment.skill
-
-# 2. Install each one in Cowork:
-#    Settings > Capabilities > + Add Skill → select the .skill file
-```
-
-Do this for both `.skill` files. Once installed, the skills appear in Cowork and behave identically to the Claude Code versions.
-
-> The `.skill` bundles are gitignored — they're generated output, not source. The source of truth is always `.claude/skills/<name>/SKILL.md`. If you customize a skill, edit the folder first, then re-run `build_skills.sh` to refresh the bundle.
-
-### Skill Creator plugin (Cowork only)
-
-**If you're on Cowork, the agent will check whether you have the Skill Creator plugin installed.** If you don't, it will prompt you to install it — not to modify these skills, but because Cowork needs it available to invoke and manage skills correctly. Install it via Settings > Capabilities if prompted.
+**Cowork** uses the *same files*. This project is designed to be installed inside your Cowork files folder (under `Projects/`), so Claude Code and Cowork share one project, one `csm_jobs.csv`, and one set of skills. A Cowork scheduled task doesn't need a separate skill install — it just references the skill files by path (e.g. "follow `.claude/skills/linkedin-csm-scraper/SKILL.md`"). See [Running it automatically](#running-it-automatically-scheduling).
 
 > This folder layout (`SKILL.md` + a `scripts/` folder) is the [Agent Skills](https://agentskills.io) open standard — plain, readable files that work across AI coding tools, not a Claude-only format.
 
 ## Quick start (with Claude Code)
 
-1. Clone this repo and open it in Claude Code.
+1. Open Claude Code and tell it: **`set up https://github.com/Sesamsesam/csm-outreach-dashboard for me`**
 2. Make sure you're logged into LinkedIn in the browser Claude controls (see Prerequisites).
-3. Type: `set this up for me`.
 
-Claude will install Flask, create your empty `csm_jobs.csv` from `schema.py`, save your name/email for cover letters, and start the dashboard. (The skills are already loaded — no install step.)
+Claude will install it into your Cowork files folder (so Cowork can see it too), check and install any prerequisites (Python, Flask), create your empty `csm_jobs.csv` from `schema.py`, save your name/email for cover letters, and start the dashboard. The skills auto-load — no install step.
+
+> **Why the Cowork files folder?** Installing there lets Claude Code and Cowork share one project and one `csm_jobs.csv`. Claude Code handles setup and on-demand runs; Cowork can run the daily scheduled scrape against the same files. Claude figures out that location automatically — you don't need to.
 
 ## Manual setup
 
@@ -109,17 +89,17 @@ A job that the enrichment skill can't find **any** contacts for is treated as lo
 
 ## Running it automatically (scheduling)
 
-The two skills run in order: the **scraper** adds new rows, then the **enrichment** skill fills in any row that isn't enriched yet. So the daily automation has to run the scraper *first*, and only start enrichment *after the scraper has finished* — otherwise enrichment would run before the day's new jobs exist. (There's no risk of corruption if they ever overlap — enrichment only ever touches rows that have no contacts yet, so any stragglers are simply caught on the next run — but you still want the scrape complete first for a same-day result.)
+A daily scrape has to drive your **logged-in LinkedIn browser** and write to your **local** `csm_jobs.csv` — so it runs **on your machine**, not in the cloud. Two ways to set it up:
 
-**Recommended — one chained daily task (guaranteed order).** Schedule a single task whose prompt runs both skills back-to-back in the same session. Because one agent runs them sequentially, enrichment can't start until the scrape reports done, no matter how long the scrape takes. In Claude Code, ask:
+**Cowork scheduled task (runs locally, daily).** Because the project lives in your shared Cowork files folder, a Cowork scheduled task can open it, scrape, and write the same `csm_jobs.csv`. Use a prompt like:
 
-> "Every day at 6am, run the linkedin-csm-scraper skill to find new jobs and add them to csm_jobs.csv. When it finishes, run the linkedin-csm-enrichment skill to enrich every row that isn't enriched yet. Then give me a short combined summary."
+> "Open the project at `<your Cowork files>/Projects/csm-outreach-dashboard`. Follow `.claude/skills/linkedin-csm-scraper/SKILL.md` to add new jobs to csm_jobs.csv. When it finishes, follow `.claude/skills/linkedin-csm-enrichment/SKILL.md` to enrich every row not yet enriched. Then give me a short combined summary."
 
-That single instruction is the whole schedule — scrape → wait for completion → enrich, all in one run.
+**On-demand in Claude Code (simplest).** Open the project and say **"run my daily job search"** — the agent scrapes, then enriches, in one session. Then **"open the dashboard"** to review.
 
-**Alternative — two separate tasks, spaced apart.** If you prefer them as two visible jobs, schedule the scraper (e.g. 6:00am) and the enrichment (e.g. 8:00am) as separate daily tasks. Leave a generous gap (≥2 hours) so a long scrape finishes first. This works because enrichment is idempotent, but it relies on the gap being big enough; the chained approach above removes that guesswork.
+**Why the order matters:** the scraper must finish before enrichment starts (enrichment fills the rows the scraper produced). A single chained task guarantees that. Enrichment is idempotent and only touches un-enriched rows, so a straggler is just caught on the next run.
 
-Either way, remember the LinkedIn-login prerequisite: scheduled runs still need a logged-in LinkedIn session in the browser Claude controls.
+**Requirements either way:** a logged-in LinkedIn session in the browser Claude controls, the machine **awake**, and someone available if LinkedIn shows a login wall or CAPTCHA (the skill stops and asks).
 
 ## Customizing for a different role
 
@@ -134,7 +114,7 @@ Claude will walk you through the handful of knobs that need to change and confir
 
 The CSV schema, the de-duplication, the "enrich anything not yet enriched" behavior, and the single-data-file rule **stay the same** — only the search and outreach wording changes. Each skill has a clearly marked **🎯 CUSTOMIZE** section at the top documenting exactly what to edit, so the change is safe and contained.
 
-Edits go in `.claude/skills/<skill-name>/SKILL.md` — the one place each skill lives. (If you later want a `.skill` bundle for Cowork/Desktop sharing, run `bash build_skills.sh` to generate one; it's gitignored.)
+Edits go in `.claude/skills/<skill-name>/SKILL.md` — the one place each skill lives. Both Claude Code and Cowork read these same files, so an edit applies everywhere.
 
 ## Hunter.io (optional)
 
@@ -157,9 +137,8 @@ Your data never goes to GitHub. The `.gitignore` excludes `csm_jobs.csv`, `seen_
 │   └── skills/               ← AUTHORITATIVE skills (auto-load in Claude Code)
 │       ├── linkedin-csm-scraper/     (SKILL.md + scripts/)
 │       └── linkedin-csm-enrichment/  (SKILL.md + scripts/)
-├── dashboard/
-│   ├── app.py                ← Flask dashboard (port 5001)
-│   ├── run.sh / run.bat      ← launchers
-│   └── .hunter_key           ← Hunter.io API key (gitignored)
-└── build_skills.sh           ← optional: generate a .skill bundle for Cowork/Desktop (gitignored)
+└── dashboard/
+    ├── app.py                ← Flask dashboard (port 5001)
+    ├── run.sh / run.bat      ← launchers
+    └── .hunter_key           ← Hunter.io API key (gitignored)
 ```

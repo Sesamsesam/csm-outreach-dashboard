@@ -42,6 +42,31 @@ _FALLBACK_CANONICAL = [
 _FALLBACK_DEFAULTS = {"outreach_status": "Not started"}
 
 
+def find_project_root() -> str:
+    """Locate the project root deterministically, independent of the CWD.
+
+    This script lives at <root>/.claude/skills/<skill>/scripts/append_jobs.py,
+    so the project root is four directories up. We confirm by checking for
+    schema.py (the project marker). If that fails (e.g. the script was copied
+    elsewhere), we walk upward looking for schema.py, and finally fall back to
+    the CWD. This is what lets a scheduled task run the scrape correctly even
+    when its working directory isn't the project folder.
+    """
+    here = os.path.dirname(os.path.abspath(__file__))
+    candidate = os.path.abspath(os.path.join(here, "..", "..", "..", ".."))
+    if os.path.exists(os.path.join(candidate, "schema.py")):
+        return candidate
+    d = here
+    for _ in range(6):
+        if os.path.exists(os.path.join(d, "schema.py")):
+            return d
+        parent = os.path.dirname(d)
+        if parent == d:
+            break
+        d = parent
+    return os.getcwd()
+
+
 def load_schema(csv_path: str):
     """Load schema.py sitting next to the master CSV; fall back to embedded constants."""
     schema_path = os.path.join(os.path.dirname(os.path.abspath(csv_path)), "schema.py")
@@ -105,9 +130,20 @@ def update_seen_ids(cache_path: str, new_ids: list):
 
 def main():
     parser = argparse.ArgumentParser(description="Append new jobs to the master tracker CSV.")
-    parser.add_argument("--csv", required=True, help="Path to the master csm_jobs.csv")
-    parser.add_argument("--jobs", required=True, help="JSON array of job dicts")
+    parser.add_argument("--csv", default=os.path.join(find_project_root(), "csm_jobs.csv"),
+                        help="Path to the master csm_jobs.csv (default: auto-located project root)")
+    parser.add_argument("--jobs", help="JSON array of job dicts")
+    parser.add_argument("--print-root", action="store_true",
+                        help="Print the auto-located project root and exit.")
     args = parser.parse_args()
+
+    if args.print_root:
+        print(find_project_root())
+        return
+
+    if not args.jobs:
+        print("ERROR: --jobs is required (unless --print-root)", file=sys.stderr)
+        sys.exit(1)
 
     schema = load_schema(args.csv)
 

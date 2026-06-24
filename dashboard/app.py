@@ -123,8 +123,17 @@ def hunter_call(endpoint, params):
 
 def read_cover_letter(job):
     path = job.get("cover_letter_path", "").strip()
-    if not path or not os.path.exists(path):
+    if not path:
         return None
+    # Stored paths are absolute. If the project folder has moved (e.g. the user
+    # changed their Cowork files location), the absolute path won't resolve —
+    # fall back to locating the same filename in this project's cover_letters/.
+    if not os.path.exists(path):
+        local = os.path.join(CL_DIR, os.path.basename(path))
+        if os.path.exists(local):
+            path = local
+        else:
+            return None
     with open(path, encoding="utf-8") as f:
         return f.read()
 
