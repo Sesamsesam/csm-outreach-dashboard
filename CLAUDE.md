@@ -1,5 +1,19 @@
 # CSM Outreach Dashboard — Guide for Claude
 
+## 📌 Read me first — house rules (Claude Code AND Cowork)
+
+**Any agent working in this project - Claude Code or Cowork - must follow these five rules before doing anything else.** They exist because the two tools share one folder, and inconsistency between them (re-running setup, rebuilding the plugin, making a second data file) is the main thing that breaks this project.
+
+1. **Setup is once.** If `setup_complete.json` exists in the project root, setup is already done - do **not** re-run it.
+2. **The plugin is an intentional thin launcher.** The file in `dist/` is short *by design*; it reads the project's live skills at runtime, so it is never stale. **Never "rebuild" or replace it with full skill content** - that breaks project-folder discovery.
+3. **One data file, ever.** There is exactly one: `csm_jobs.csv`. Never create a second CSV, never rename it.
+4. **Targeting lives in `search_config.json`.** To change what's searched/enriched (role, location, filters, contacts, tone), edit `search_config.json` - never hard-code role values into the skills. See `RETARGETING.md`.
+5. **Retargeting is forward-only.** Changing the search never deletes or re-filters existing rows in `csm_jobs.csv` - old jobs stay.
+
+Everything below expands on these. When in doubt, these five win.
+
+---
+
 > **FORMATTING RULE - NO EM DASHES:** Never use em dashes (--) anywhere - not in DMs, cover letters, reports, summaries, or any other output. Always use a regular hyphen (-) instead. This rule applies across all skills and all generated text, without exception.
 
 This is a LinkedIn job-outreach tracker with a local web dashboard, two Claude Code skills (scrape + enrich), and optional Hunter.io email lookup. It ships tuned for **Customer Success Manager** roles but is built to be retargeted to any job title.
