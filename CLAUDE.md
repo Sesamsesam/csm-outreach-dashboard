@@ -20,9 +20,13 @@ This single-file discipline is the whole point of the project structure — the 
 This project is built to live in a single folder that **both Claude Code and Cowork can see**, so there's one project, one `csm_jobs.csv`, and one set of skills no matter which tool touches it.
 
 - **Claude Code** does the one-time setup (cloning, installing Flask, creating the CSV) and the on-demand work ("run my daily job search", "open the dashboard"). It auto-loads the skills from `.claude/skills/` whenever the project folder is open.
-- **Cowork** can run the recurring **scheduled scrape** locally (it drives the user's logged-in browser and writes to the same `csm_jobs.csv`). Cowork does not auto-load `.claude/skills/`, but it doesn't need a separate skill install either — a scheduled task simply **references the skill files by path**, e.g. *"follow the steps in `.claude/skills/linkedin-csm-scraper/SKILL.md` to add new jobs to `csm_jobs.csv`."* Because the folder is shared, Cowork reads the same authoritative `SKILL.md` Claude Code uses.
+- **Cowork** runs the recurring **scheduled scrape** locally (it drives the user's logged-in browser and writes to the same `csm_jobs.csv`). Cowork uses the **CSM Outreach Dashboard plugin** (in `dist/csm-outreach-dashboard.plugin`) which adds the two skills to the Cowork panel. The plugin skills are thin launchers that discover the project root from the Cowork config and then delegate to the authoritative `SKILL.md` files in `.claude/skills/`. This means the project skills remain the single source of truth for both tools.
 
-The `.claude/skills/<name>/` folders are the **single source of truth**. There are no `.skill` bundles to build and no Skill Creator plugin to install — ignore any older instructions that mention them.
+The `.claude/skills/<name>/` folders are the **single source of truth**. The plugin in `dist/` is a thin wrapper — it does not duplicate skill logic.
+
+## "Set this up" trigger
+
+If the user says anything like "set this up", "get me started", "initialize this", or "install this" — run the setup steps below in order. This is the intended onboarding phrase for new users in Cowork.
 
 ## When a new user opens this project
 
@@ -137,12 +141,21 @@ python3 schema.py
 ```
 This creates an empty `csm_jobs.csv` with the correct columns (from `schema.py`). It will not overwrite an existing file. There is no separate template/example CSV to copy.
 
-### 3. Skills — nothing to install
-The two skills live in `.claude/skills/` and **auto-load** when the project is open in Claude Code. There is no install command (do **not** tell the user to run `claude skills install` — that's not a real command). The user already has:
+### 3. Skills
+
+**Claude Code:** The two skills live in `.claude/skills/` and **auto-load** when the project is open in Claude Code. No install command needed. The user already has:
 - `/linkedin-csm-scraper` — scrapes new LinkedIn postings into `csm_jobs.csv`
 - `/linkedin-csm-enrichment` — enriches any row that hasn't been enriched yet
 
-The `.claude/skills/<name>/` folders are the **single source of truth**. When editing a skill (e.g. retargeting the job title), edit the folder under `.claude/skills/` — that's the only copy. (For Cowork's scheduled scrape, a task just references these same files by path; nothing extra to install.)
+**Cowork:** Present the pre-built plugin file for one-click install:
+
+```
+dist/csm-outreach-dashboard.plugin
+```
+
+Use `mcp__cowork__present_files` (or the present_files tool) to show the file in chat — it renders with an "Install plugin" button. Tell the user: "Click Install to add the scraper and enrichment skills to your Cowork panel."
+
+The plugin skills are thin launchers that discover the project root at runtime and delegate to the `.claude/skills/` files, so the project skills remain the single source of truth for both Claude Code and Cowork.
 
 **Prerequisite to flag:** the skills drive a browser to read LinkedIn, so the user must be **logged into LinkedIn** in the browser Claude controls before scraping or enriching. If a login wall appears, stop and ask them to log in.
 
@@ -179,7 +192,7 @@ This file is gitignored. The enrichment skill reads it for cover-letter signatur
 
 A scheduled scrape needs to drive a **logged-in LinkedIn browser** and write to the **local** `csm_jobs.csv`. That means it must run **on the user's machine**, not as a cloud agent. Two ways to set it up:
 
-- **Cowork scheduled task (runs locally).** Because the project lives in the shared Cowork files folder, a Cowork scheduled task can open this project, scrape, and write the same `csm_jobs.csv`. The task prompt should reference the skill files by path, e.g.: *"Open the project at `<coworkUserFilesPath>/Projects/csm-outreach-dashboard`. Follow `.claude/skills/linkedin-csm-scraper/SKILL.md` to add new jobs to `csm_jobs.csv`. When that finishes, follow `.claude/skills/linkedin-csm-enrichment/SKILL.md` to enrich every row not yet enriched. Then give a short combined summary."*
+- **Cowork scheduled task (runs locally).** With the plugin installed, the user can ask Cowork to schedule a daily scrape and it will use the plugin skills automatically. Example task prompt: *"Use the LinkedIn CSM Scraper skill to find new jobs. When that finishes, use the LinkedIn CSM Enrichment skill to enrich every row not yet enriched. Give a short combined summary."* The plugin skills handle project path discovery at runtime — no paths needed in the task prompt.
 - **On-demand in Claude Code.** The simplest reliable flow: the user opens the project and says *"run my daily job search"* — the agent runs scrape → enrich in one session.
 
 **Ordering:** the scraper must finish before enrichment starts (enrichment acts on the rows the scraper produced). A single chained task guarantees this. Enrichment is idempotent and only touches un-enriched rows, so a missed straggler is just caught next run.
@@ -216,6 +229,8 @@ Walk the user through each knob, confirm their preferences, edit the `SKILL.md` 
 ├── .claude/skills/           ← AUTHORITATIVE skills (auto-load in Claude Code)
 │   ├── linkedin-csm-scraper/     (SKILL.md + scripts/append_jobs.py)
 │   └── linkedin-csm-enrichment/  (SKILL.md + scripts/update_contacts.py)
+├── dist/
+│   └── csm-outreach-dashboard.plugin  ← Cowork plugin (present this for install in Step 3)
 └── dashboard/
     ├── app.py                ← Flask dashboard (port 5001)
     └── run.sh / run.bat      ← launchers
