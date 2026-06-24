@@ -25,21 +25,97 @@ The skills in `.claude/skills/` auto-load in **Claude Code CLI** on clone. In **
 
 ## When a new user opens this project
 
-Run these steps to get them going:
+Run these steps **in order** to get them going. The user may be non-technical — do not tell them to open a terminal or run commands themselves. Run everything yourself. Only tell the user something if you need them to take a physical action (like clicking a button in a dialog).
 
-### 1. Install dependencies
+### 0. Check prerequisites (run these checks silently — install what's missing)
+
+First, detect the OS:
 ```bash
-pip3 install flask     # macOS/Linux
-pip install flask      # Windows
+uname -s 2>/dev/null || echo "Windows"
 ```
+- `Darwin` → macOS. Follow the **macOS** path below.
+- `Windows` or if `uname` fails → Windows. Follow the **Windows** path below.
+- `Linux` → Follow the macOS path (skip Xcode/Homebrew steps; use `apt`, `dnf`, or whatever package manager is available).
 
-### 2. Create their one data file
+Work through the checklist for the detected OS. Run each check yourself. If something is missing, install it automatically. Only involve the user if a step requires their physical action (like clicking a button in a dialog or typing a password).
+
+---
+
+#### macOS prerequisites
+
+**a) Xcode Command Line Tools**
+```bash
+xcode-select -p 2>/dev/null && echo "INSTALLED" || echo "MISSING"
+```
+If MISSING: run `xcode-select --install`. This opens a macOS dialog — tell the user: "A dialog just appeared asking to install Command Line Tools. Click Install and wait for it to finish." Then wait for the install to complete before continuing. Do not proceed until `xcode-select -p` returns a path.
+
+**b) Homebrew**
+```bash
+which brew && echo "INSTALLED" || echo "MISSING"
+```
+If MISSING: run the official installer:
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+This may prompt for the user's password in the terminal — tell them: "Homebrew needs your Mac password to install. Type it in the terminal where you see the prompt (the characters won't show as you type, that's normal)." After install, ensure brew is on PATH (on Apple Silicon: `eval "$(/opt/homebrew/bin/brew shellenv)"`).
+
+**c) Python 3**
+```bash
+python3 --version 2>/dev/null && echo "INSTALLED" || echo "MISSING"
+```
+If MISSING: install via Homebrew (`brew install python3`). Do not ask the user to download from python.org.
+
+**d) pip3**
+```bash
+pip3 --version 2>/dev/null && echo "INSTALLED" || echo "MISSING"
+```
+If MISSING after Python 3 is installed: run `python3 -m ensurepip --upgrade`.
+
+**e) Flask**
+```bash
+pip3 show flask 2>/dev/null && echo "INSTALLED" || echo "MISSING"
+```
+If MISSING: run `pip3 install flask`.
+
+---
+
+#### Windows prerequisites
+
+**a) Git**
+```powershell
+git --version 2>$null && echo "INSTALLED" || echo "MISSING"
+```
+If MISSING: run `winget install Git.Git --accept-package-agreements --accept-source-agreements`. If `winget` itself is not available (older Windows 10), tell the user: "Git isn't installed and I can't install it automatically. Please download and install it from https://git-scm.com/download/win, then come back and say 'continue'." Do not tell them to open a terminal — that message is their only action.
+
+**b) Python 3**
+```powershell
+python --version 2>$null && echo "INSTALLED" || echo "MISSING"
+```
+Note: on Windows, the command is `python` not `python3`. If MISSING: run `winget install Python.Python.3.12 --accept-package-agreements --accept-source-agreements`. After install, verify `python --version` works. If `winget` is unavailable, tell the user: "Python isn't installed and I can't install it automatically. Please download and install it from https://www.python.org/downloads/ — make sure to check 'Add Python to PATH' during install — then come back and say 'continue'."
+
+**c) pip**
+```powershell
+pip --version 2>$null && echo "INSTALLED" || echo "MISSING"
+```
+If MISSING after Python is installed: run `python -m ensurepip --upgrade`.
+
+**d) Flask**
+```powershell
+pip show flask 2>$null && echo "INSTALLED" || echo "MISSING"
+```
+If MISSING: run `pip install flask`.
+
+---
+
+Only after ALL prerequisites for the detected OS pass, continue to step 1.
+
+### 1. Create their one data file
 ```bash
 python3 schema.py
 ```
 This creates an empty `csm_jobs.csv` with the correct columns (from `schema.py`). It will not overwrite an existing file. There is no separate template/example CSV to copy.
 
-### 3. Skills — nothing to install
+### 2. Skills — nothing to install
 The two skills live in `.claude/skills/` and **auto-load** when the project is open in Claude Code. There is no install command (do **not** tell the user to run `claude skills install` — that's not a real command). The user already has:
 - `/linkedin-csm-scraper` — scrapes new LinkedIn postings into `csm_jobs.csv`
 - `/linkedin-csm-enrichment` — enriches any row that hasn't been enriched yet
@@ -48,16 +124,16 @@ The `.claude/skills/<name>/` folders are the **single source of truth** (the Age
 
 **Prerequisite to flag:** the skills drive a browser to read LinkedIn, so the user must be **logged into LinkedIn** in the browser Claude controls before scraping or enriching. If a login wall appears, stop and ask them to log in.
 
-### 4. Start the dashboard
+### 3. Start the dashboard
 ```bash
 bash dashboard/run.sh      # macOS/Linux
 dashboard\run.bat          # Windows
 # or cross-platform:
 python3 dashboard/app.py
 ```
-Then open **http://localhost:5001**.
+Then tell the user to open **http://localhost:5001** in their browser.
 
-### 5. Save their personal details for cover letters
+### 4. Save their personal details for cover letters
 Ask for the user's full name and email, then write `user_profile.txt` in the project root:
 ```
 Name: [their full name]
@@ -65,7 +141,7 @@ Email: [their email]
 ```
 This file is gitignored. The enrichment skill reads it for cover-letter signatures so it never has to ask mid-session. If skipped, the enrichment skill will ask the first time it writes a cover letter.
 
-### 6. (Optional) Hunter.io for executive email lookup
+### 5. (Optional) Hunter.io for executive email lookup
 - Sign up free at https://hunter.io (25 domain searches/month on the free plan).
 - In the dashboard, open any job → the **Hunter.io** sidebar → paste the API key.
 - The key saves to `dashboard/.hunter_key` (gitignored).
