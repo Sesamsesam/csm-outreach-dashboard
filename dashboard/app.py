@@ -323,11 +323,15 @@ BASE_HTML = """
     .ss-body { padding: 4px 18px 16px; }
     .ss-note { font-size: .76rem; color: var(--ink-soft); margin-bottom: 12px; }
     .ss-note code { background: #eef1f4; padding: 1px 5px; border-radius: 4px; font-size: .72rem; }
-    .ss-table { width: 100%; border-collapse: collapse; }
-    .ss-table td { padding: 6px 0; border-top: 1px solid var(--line); font-size: .8rem; vertical-align: top; }
-    .ss-table tr:first-child td { border-top: none; }
-    .ss-key { color: var(--ink-faint); width: 38%; font-weight: 600; padding-right: 12px; }
-    .ss-val { color: var(--ink); }
+    /* Responsive grid of compact label-over-value cells, so the value sits
+       right under its label instead of across a wide row. */
+    .ss-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 1px; background: var(--line); border: 1px solid var(--line);
+        border-radius: 8px; overflow: hidden; }
+    .ss-item { background: var(--surface); padding: 9px 13px; }
+    .ss-key { display: block; font-size: .67rem; text-transform: uppercase; letter-spacing: .4px;
+        color: var(--ink-faint); font-weight: 700; margin-bottom: 3px; }
+    .ss-val { font-size: .82rem; color: var(--ink); line-height: 1.3; }
 
     /* Search */
     .search-wrap input { font-size: .85rem; border-radius: 8px; padding: .4rem .9rem; border: none; }
@@ -434,11 +438,14 @@ INDEX_HTML = BASE_HTML.replace("{% block content %}{% endblock %}", """
       including scheduled scrapes. To change them, ask Claude to retarget your search (it edits
       <code>search_config.json</code>). Existing jobs below are never removed when you change these.
     </p>
-    <table class="ss-table">
+    <div class="ss-grid">
       {% for label, value in cfg_rows %}
-      <tr><td class="ss-key">{{ label }}</td><td class="ss-val">{{ value or '-' }}</td></tr>
+      <div class="ss-item">
+        <span class="ss-key">{{ label }}</span>
+        <span class="ss-val">{{ value or '-' }}</span>
+      </div>
       {% endfor %}
-    </table>
+    </div>
   </div>
 </details>
 
