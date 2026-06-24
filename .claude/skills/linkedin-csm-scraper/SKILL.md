@@ -35,7 +35,7 @@ There is **exactly one** data file in this project: **`{project_root}/csm_jobs.c
 
 This skill's behavior is driven entirely by the search config (the code-word legend) - **the skill text itself names no role.** To change or add to what gets scraped, **don't guess** — the single entry point is **`{project_root}/RETARGETING.md`**, and the change is a single edit to **`search_config.json`** (the menu card). Walk the user through it and confirm each change.
 
-The scraper code-words (all documented in `RETARGETING.md` with their LinkedIn meaning) are: `search_keywords`, `title_match_phrase`, `location`, `work_type`, `seniority`, `recency`, `pages_to_scrape`, `blocklist_companies`, and `blocklist_phrases`. Capturing a brand-new field (a new CSV column) is the one case that also touches `schema.py` - see `RETARGETING.md`.
+The scraper code-words (all documented in `RETARGETING.md` with their LinkedIn meaning) are: `search_keywords`, `title_match_phrase`, `location`, `work_type`, `seniority`, `recency`, `pages_to_scrape`, `blocklist_companies`, `blocklist_phrases`, `exclude_work_permit_required`, `work_permit_block_phrases`, and `work_permit_positive_phrases`. Capturing a brand-new field (a new CSV column) is the one case that also touches `schema.py` - see `RETARGETING.md`.
 
 **Forward-only:** retargeting never touches rows already in `csm_jobs.csv` — old jobs stay in the tracker even if they no longer match the new knobs. The CSV schema, the de-dup logic, and the single-master-file rule **do not change** when retargeting — only the config values. After editing `search_config.json`, tell the user what changed.
 
@@ -81,6 +81,9 @@ for name in ('search_config.json', 'search_config.example.json'):
 | `{recency}` | the `f_TPR=` URL param |
 | `{pages_to_scrape}` | how many pages to page through (Step 4) |
 | `{blocklist_companies}` / `{blocklist_phrases}` | the aggregator/recruiter blocklist (Step 3b) |
+| `{exclude_work_permit_required}` | if `true`, skip jobs that explicitly won't sponsor (Step 3g) |
+| `{work_permit_block_phrases}` | "no sponsorship" phrases that trigger a skip (Step 3g) |
+| `{work_permit_positive_phrases}` | phrases that mark a job as sponsorship-friendly (Step 3c / 3g) |
 
 **Hard rule:** the steps below contain **only code-words in `{curly braces}`** for anything role-specific - never a literal role name, keyword, or filter value. Always substitute the value loaded from the config. Never scrape for a role the config does not specify. The config is the only place the actual values live (the live `search_config.json`, or the committed `search_config.example.json` default). If **neither** file exists, stop and tell the user the search config is missing - do not invent values.
 
@@ -181,7 +184,8 @@ Parse from the `get_page_text` article output:
 | `job_title` | The job title heading at the top of the article |
 | `company` | Company name from the JS in step 3b |
 | `job_location` | Look for "Remote", "United States", or a city name near the top |
-| `salary` | Any dollar amount or range (e.g. "$100K–$150K", "$76,900 USD"); leave blank if absent |
+| `salary` | Any dollar amount or range (e.g. "$100K–$150K", "$76,900 USD"); leave blank if absent. A blank salary never disqualifies a job. |
+| `work_authorization` | Scan the description for sponsorship language. If it contains any `{work_permit_positive_phrases}` entry → `"Sponsorship available"`. If it contains any `{work_permit_block_phrases}` entry → `"No sponsorship"`. Otherwise → `"Not specified"`. This field also drives the `{exclude_work_permit_required}` filter in Step 3g. |
 | `applicant_count` | Text like "Over 100 people clicked apply" or "25 applicants"; leave blank if absent |
 | `linkedin_job_url` | `https://www.linkedin.com/jobs/view/{job_id}/` |
 | `date_scraped` | Today's date in YYYY-MM-DD format |
@@ -244,6 +248,16 @@ This returns the `href` directly without navigating. Both "Learn more" and "Visi
 
 If `find` returns no result, leave `company_website` blank and continue.
 
+### 3g — Apply the work-permit filter
+
+After the fields are extracted, decide whether this job earns a row. This filter is a config toggle loaded in Step 0a; apply it only when the toggle is on. A job that fails it is **dropped - do not create a row for it** (same as a blocklisted job). Do **not** add its ID to `seen_job_ids.txt`, so a later run can re-check it if the posting is updated (a sponsorship note may be added after first posting).
+
+**Work-permit filter** - if `{exclude_work_permit_required}` is `true` and the description contains any phrase in `{work_permit_block_phrases}` (case-insensitive - these are explicit "no sponsorship" statements), **skip the job.** A posting that simply says nothing about sponsorship is **kept** (its `work_authorization` is `"Not specified"`); only an explicit refusal triggers the skip.
+
+> Salary is **not** a filter - a job with no salary shown is always kept (a blank `salary` is fine). Only the work-permit check can drop a job here.
+
+Jobs that pass keep their extracted `work_authorization` value and proceed to the CSV in Step 5. When you skip a job here, note it for the Step 6 report (e.g. "1 skipped: no sponsorship").
+
 ---
 
 ## Step 4 — Paginate
@@ -278,10 +292,17 @@ Tell the user:
 - How many pages were scraped
 - How many total matching jobs were found across all pages
 - How many were skipped (aggregators/recruiters) and why
+- How many were skipped by the work-permit filter (Step 3g) and why
 - How many were added vs skipped as duplicates
 - Path to the updated CSV
 
-Example: "Scraped 2 pages. Found 18 matching titles. Skipped 4 (2 aggregators, 2 recruiters). Added 11 new rows, 3 already in your tracker."
+Example: "Scraped 2 pages. Found 18 matching titles. Skipped 4 (2 aggregators, 2 recruiters), 1 that won't sponsor. Added 11 new rows, 2 already in your tracker."
+
+## Step 7 — Automatically run enrichment
+
+**Do not ask the user whether to enrich. Always proceed immediately.**
+
+After reporting the scrape results, run the enrichment skill (`/linkedin-csm-enrichment` in Claude Code, or follow `.claude/skills/linkedin-csm-enrichment/SKILL.md` in Cowork) to enrich every row that hasn't been enriched yet. The scraper and enrichment skills are designed to run in tandem - scrape first, then enrich - as a single uninterrupted flow. Never stop between them to ask for confirmation.
 
 ---
 
@@ -292,5 +313,6 @@ Example: "Scraped 2 pages. Found 18 matching titles. Skipped 4 (2 aggregators, 2
 - **Job expired mid-run**: If the `currentJobId` URL loads the job list but shows no matching right panel, the job was removed — skip it.
 - **Company page returns 404 or redirect**: Leave all company fields blank, continue.
 - **No website button found**: Leave `company_website` blank, continue — do not navigate to guess the URL.
-- **Salary absent**: Leave blank — never guess or pull from external sources.
+- **Salary absent**: Leave blank — never guess or pull from external sources. A blank salary never disqualifies a job.
+- **Sponsorship language ambiguous**: Only treat an *explicit* refusal (a `{work_permit_block_phrases}` match) as "won't sponsor". Generic "must be authorized to work" with no mention of sponsorship is **not** a refusal - set `work_authorization` to "Not specified" and keep the job.
 - **CAPTCHA appears**: Stop, save whatever jobs have been collected so far by running the CSV script, then report to the user.

@@ -4,7 +4,7 @@
 
 This guide is the **single entry point** for changing what the two skills look for. It works the same whether the user is in **Claude Code** or **Cowork** (the Cowork plugin launchers delegate to the same `.claude/skills/` files, which read the same config this guide edits).
 
-Use this whenever the user wants to **change** the search (different role, location, remote setting, recency, seniority, tone) **or add** something new (a new filter, a new captured field, a new contact type).
+Use this whenever the user wants to **change** the search (different role, location, remote setting, recency, seniority, tone) **or add** something new (a new filter, a brand-new knob, a new captured field, a new contact type). For a brand-new knob, jump to **"Adding a brand-new knob: the full sync checklist"** - it lists every file to touch so the config never drifts out of sync with what runs.
 
 ---
 
@@ -47,10 +47,13 @@ So retargeting = **edit `search_config.json`** (create it by copying `search_con
 | Change role / keywords / title filter | **No** | Edit `search_config.json` only. |
 | Change location / remote / seniority / recency / pages | **No** | Edit `search_config.json` only. |
 | Change contact tiers / function codes / DM tone / cover-letter emphasis / zero-contact behavior | **No** | Edit `search_config.json` only. |
-| Add/adjust a filter (new aggregator to skip, new keyword) | **No** | Edit the relevant list in `search_config.json`. |
+| Adjust an **existing** list/value (add an aggregator to skip, add a keyword, change a tone) | **No** | Edit the relevant key in `search_config.json`. One-file change. |
+| Add a **brand-new knob** (a config key that does not exist yet, e.g. a new filter toggle) | **No** (usually) | Follow **Adding a brand-new knob: the full sync checklist** below. More than one file, but no CSV change. |
 | **Capture a brand-new field** (e.g. "track visa sponsorship", add a 5th contact) | **Yes** | Follow **Additive change: new captured field** below. |
 
 The only thing that ever changes the CSV is **adding a new captured field** (a new column). Everything else is config. And even a new column is **additive** - it appends a blank column and never deletes existing rows.
+
+> **Adjusting an existing knob vs. adding a new one.** If the knob already exists in `search_config.example.json` (it has a row in the Config Reference below), changing it is a **one-file edit** to `search_config.json` - the skills already read it. If the knob is **new** (no key today), the config alone is not enough: the skill has to be taught to *load* and *use* it, or it will be silently ignored. That is the drift trap the checklist below exists to prevent.
 
 ---
 
@@ -68,6 +71,11 @@ The only thing that ever changes the CSV is **adding a new captured field** (a n
 | `pages_to_scrape` | how many result pages to page through | `3` |
 | `blocklist_companies` | aggregator/recruiter company names to skip | see config |
 | `blocklist_phrases` | hidden-employer phrases to skip | see config |
+| `exclude_work_permit_required` | if `true`, skip a job whose description has an explicit "no sponsorship" phrase; jobs silent on sponsorship are kept | `true` |
+| `work_permit_block_phrases` | the explicit "won't sponsor" phrases that trigger the skip | see config |
+| `work_permit_positive_phrases` | phrases that mark a kept job as "Sponsorship available" in the `work_authorization` column | see config |
+
+> The work-permit filter records its finding in the `work_authorization` column (`Sponsorship available` / `No sponsorship` / `Not specified`). That column is shipped as a `custom_fields_added` entry, so it already exists in `schema.py` - turning the filter on/off is config-only and never touches the CSV schema.
 
 ### `enrichment` block
 | Config key | Controls | CSM default |
@@ -95,6 +103,38 @@ The only thing that ever changes the CSV is **adding a new captured field** (a n
 
 ### LinkedIn function codes (for `recruiter_function_code` / `function_code`)
 `12` HR/Recruiting · `26` Sales/Customer Success cluster · `13` Engineering · `15` IT · `17` Marketing · `4` Business Development · `10` Finance. If unsure, omit the function filter and rely on `keywords` - the search still works, just less precisely.
+
+---
+
+## Adding a brand-new knob: the full sync checklist
+
+Use this when the user asks for a **new** behavior knob that does not exist in the config yet (a new filter toggle, a new phrase list, a new search parameter). The work-permit filter (`exclude_work_permit_required` + its phrase lists) was added exactly this way - use it as the worked example.
+
+A knob is only "wired" when **every** place that needs to know about it has been updated. Touch these in order; skipping any one is how drift happens.
+
+| # | File | What to add | Why it is required |
+|---|---|---|---|
+| 1 | **`search_config.example.json`** | The new key (+ an optional `*_label` companion for display) under the right block (`scraper` or `enrichment`). Add a one-line note to `_filters_note` / `_README` if behavior is non-obvious. | This is the committed default **and** the fallback a fresh clone uses. The knob's real default lives here. |
+| 2 | **`.claude/skills/<skill>/SKILL.md`** (scraper and/or enrichment) | (a) add the key to the **Step 0a "bind these code-words" table**; (b) reference it only as a `{code-word}` in the step that uses it - never inline a literal value; (c) state the **default-if-absent** behavior. | The skill only "sees" config keys it loads in Step 0a. A key the skill never binds is dead config. This is the step most often forgotten. |
+| 3 | **`RETARGETING.md`** (this file) | A row in the Config Reference table for the new key. | So the next retarget knows the knob exists and what it controls - keeps this guide self-complete. |
+| 4 | **`dashboard/app.py`** -> `search_config_summary()` | A `(label, value)` row reading the new key with `s.get("key", default)` (or `e.get(...)`). | The "Current search settings" panel is how the user confirms what the next run will do. Read defensively so older configs without the key still render. |
+| 5 | *(only if the knob captures new per-job data)* **`schema.py` + migration** | A new CSV column. | Follow **Additive change: new captured field** below. A pure filter/search knob does **not** need a column; a "record X about each job" knob does. |
+
+### The drift traps (read these every time)
+
+- **The live config is gitignored and per-user.** `search_config.json` already exists on the user's machine and will **not** automatically gain your new key. So: (a) the skill must read the key with a safe default (`(s.get("the_key", <default>))`) so existing live configs keep working, **and** (b) when the user actually asks to use the knob, write the key into their live `search_config.json` too (create it from `search_config.example.json` if absent). Updating only the example file means the new knob never takes effect for that user.
+- **Never inline a value in a skill.** Anything role- or run-specific stays a `{code-word}` resolved from config. A literal in `SKILL.md` is drift waiting to happen.
+- **Never rebuild the Cowork plugin for a knob.** The launchers in `dist/` read the live `.claude/skills/` files at runtime, so a knob added to the config + skills is picked up automatically - no rebuild, no reinstall. Rebuilding would re-introduce drift (see CLAUDE.md). The plugin only changes if the launcher *shape* changes, never for knob/skill content.
+- **Forward-only + one data file still hold.** Adding a knob never edits existing `csm_jobs.csv` rows and never renames the file.
+
+### Verify the wiring before reporting done
+
+1. **Config loads:** run the Step 0a snippet (or `python3 -c "import json; print(json.load(open('search_config.example.json'))['scraper'])"`) and confirm the new key prints.
+2. **Skill binds it:** grep the skill for the `{code-word}` - it must appear in both the Step 0a table and the step that uses it.
+3. **Panel shows it:** load the dashboard (or call `search_config_summary()`) and confirm the new row renders with the expected value.
+4. **(If a column was added)** confirm `python3 schema.py` reports the new count and a test append lands the value in the right column.
+
+Then report back: which knob, its default, and that existing rows were untouched.
 
 ---
 

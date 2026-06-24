@@ -30,7 +30,8 @@ from datetime import date
 _FALLBACK_MASTER = "csm_jobs.csv"
 _FALLBACK_CANONICAL = [
     "job_id", "date_scraped", "job_title", "company", "company_tagline", "industry",
-    "hq_location", "company_size", "job_location", "salary", "applicant_count",
+    "hq_location", "company_size", "job_location", "salary", "work_authorization",
+    "applicant_count",
     "easy_apply", "linkedin_job_url", "company_linkedin_url", "company_website",
     "key_requirements", "outreach_status",
     "contact1_name", "contact1_title", "contact1_linkedin", "contact1_dm",

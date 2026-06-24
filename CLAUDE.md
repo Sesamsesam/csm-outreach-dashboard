@@ -48,7 +48,7 @@ If the user says anything like "set this up", "get me started", "initialize this
 
 **Before running ANY setup step, check for a `setup_complete.json` file in the project root.**
 
-- **If it exists** → setup has already been completed on this machine (likely by Claude Code, or by a previous Cowork run). **Do NOT re-run the setup steps.** Read the file, then tell the user something like: "This project was already set up by `{set_up_by}` on `{timestamp}`, so I'll skip setup." Then go straight to next actions: offer to run a scrape (`/linkedin-csm-scraper`), enrich (`/linkedin-csm-enrichment`), or open the dashboard (http://localhost:5001). This is the common case when Cowork opens a folder that Claude Code already initialized — both tools share this one folder, so the work is already done.
+- **If it exists** → setup has already been completed on this machine (likely by Claude Code, or by a previous Cowork run). **Do NOT re-run the setup steps.** Read the file, then tell the user something like: "This project was already set up by `{set_up_by}` on `{timestamp}`, so I'll skip setup." **However, if you are running in Cowork, you MUST still present the plugin file for installation** — Claude Code doesn't install the Cowork plugin, so even though setup is "complete", the user may not have the plugin yet. Present `dist/csm-outreach-dashboard.plugin` using `present_files` so the user can click Install (see Step 3 below for details). Then go straight to next actions: offer to run a scrape, enrich, or open the dashboard (http://localhost:5001). This is the common case when Cowork opens a folder that Claude Code already initialized — both tools share this one folder, so the work is already done.
 - **If it does NOT exist** → this is a fresh setup. Run the setup steps below in order. The file is gitignored, so a fresh clone from GitHub will never have it — which is correct: a new user's machine genuinely needs setup. Every individual step is idempotent (check-then-act), so even a re-run is safe.
 - **Write the marker only at the very END of a fully successful setup.** Create `setup_complete.json` with: `set_up_by` (the tool doing setup, e.g. "Claude Code" or "Cowork"), `timestamp` (ISO 8601), `install_path`, and a `steps_completed` array. Writing it only on full success means "file exists = setup fully done"; a setup that dies partway leaves no marker, so the next run correctly resumes (safely, because steps are idempotent).
 
@@ -240,11 +240,13 @@ A scheduled scrape needs to drive a **logged-in LinkedIn browser** and write to 
 
 ## Retargeting / changing the job search (trigger)
 
-If the user wants to **change or add to** what the skills look for - a different role, a different location/remote/seniority/recency setting, a different outreach tone, a new filter, or capturing a brand-new field - **follow [`RETARGETING.md`](RETARGETING.md).** That file is the single entry point and works identically in Claude Code and Cowork (the Cowork plugin launchers delegate to the same `.claude/skills/` files it edits).
+If the user wants to **change or add to** what the skills look for - a different role, a different location/remote/seniority/recency setting, a different outreach tone, a new filter, **a brand-new knob**, or capturing a brand-new field - **follow [`RETARGETING.md`](RETARGETING.md).** That file is the single entry point and works identically in Claude Code and Cowork (the Cowork plugin launchers delegate to the same `.claude/skills/` files it edits).
+
+> **Adding or changing a knob is never a one-off edit you improvise.** A knob can be wired in up to four places (the example config, the skill's Step 0a load table + the step that uses it, this guide's knob reference, and the dashboard panel) - skip one and the config drifts out of sync with what actually runs. `RETARGETING.md` has the exact, ordered checklist (**"Adding a brand-new knob: the full sync checklist"**) plus the drift traps (the live config is gitignored and per-user; never inline values in skills; never rebuild the plugin for a knob). Use it - do not guess the file list from memory.
 
 **How it works:** all the knobs live in one config file, **`search_config.json`** (project root). Both skills load it at the start of every run - scheduled or on-demand - and use only its values for every scraping/enrichment decision. The role-specific strings inline in the skills are just defaults; the config always wins. So retargeting = **edit that one file**, and every future run (including scheduled scrapes) follows the new targeting. This is the one-way street: a scheduled task can never drift back to the old role, because it reads the same config the user just changed. The dashboard shows a "Current search settings" panel reading the same file, so the user always sees what the next run will do.
 
-`RETARGETING.md` contains: the full knob reference (by config key), a plain-English interview flow, a "does this touch the CSV?" decision rule, and the safe procedure for additive changes (new column / new contact type). **Engage with the user - don't guess.**
+`RETARGETING.md` contains: the full knob reference (by config key), a plain-English interview flow, a "does this touch the CSV?" decision rule, the **"add a brand-new knob" sync checklist** (every file to touch, in order, with a verify step), and the safe procedure for additive changes (new column / new contact type). **Engage with the user - don't guess.**
 
 Files: `search_config.json` is the live, gitignored settings (personal targeting never ships); `search_config.example.json` is the committed Customer Success Manager default and the fallback a fresh clone uses.
 
@@ -288,6 +290,6 @@ Two things that never change when retargeting:
 
 | Group | Columns |
 |---|---|
-| Scraper | job_id, date_scraped, job_title, company, company_tagline, industry, hq_location, company_size, job_location, salary, applicant_count, easy_apply, linkedin_job_url, company_linkedin_url, company_website, key_requirements, outreach_status |
+| Scraper | job_id, date_scraped, job_title, company, company_tagline, industry, hq_location, company_size, job_location, salary, work_authorization, applicant_count, easy_apply, linkedin_job_url, company_linkedin_url, company_website, key_requirements, outreach_status |
 | Enrichment | contact1–4 (name/title/linkedin/dm), cover_letter_path |
 | Dashboard | discovered_execs (JSON array of execs found via Hunter.io) |

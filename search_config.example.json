@@ -2,6 +2,7 @@
   "_README": "SINGLE SOURCE OF TRUTH for what the two skills scrape and enrich. This is the SHIPPED DEFAULT (Customer Success Manager). The live, user-edited copy is search_config.json (gitignored). The scraper and enrichment skills load the live config at the START of every run - scheduled or on-demand - and use ONLY these values for every scraping and enrichment decision. To retarget, follow RETARGETING.md, which edits the live search_config.json. Never edit knob values inline in the skills; edit them here.",
   "last_updated": "2026-06-24",
   "role_label": "Customer Success Manager",
+  "_filters_note": "exclude_work_permit_required skips a posting only when its description contains a work_permit_block_phrases entry (explicit 'no sponsorship' language); postings that are silent on sponsorship are KEPT. It is a config toggle - set to false to disable. The work_authorization column records what was detected per kept job.",
 
   "scraper": {
     "search_keywords": "Customer+Success+Manager",
@@ -15,7 +16,48 @@
     "recency_label": "past 24 hours",
     "pages_to_scrape": 3,
     "blocklist_companies": ["Swooped", "Ladders", "Jobgether", "Recruit.net", "Jobot", "Nexxt", "Talentify", "Employbl", "Adzuna", "Hirect", "Sci-Rec"],
-    "blocklist_phrases": ["currently partnered with", "we are not the employer", "on behalf of", "our client is", "confidential company"]
+    "blocklist_phrases": ["currently partnered with", "we are not the employer", "on behalf of", "our client is", "confidential company"],
+
+    "exclude_work_permit_required": true,
+    "work_permit_label": "skip jobs that explicitly won't sponsor",
+    "work_permit_block_phrases": [
+      "no visa sponsorship",
+      "no sponsorship",
+      "without sponsorship",
+      "do not provide sponsorship",
+      "does not provide sponsorship",
+      "will not provide sponsorship",
+      "not provide sponsorship",
+      "unable to provide sponsorship",
+      "not able to provide sponsorship",
+      "do not offer sponsorship",
+      "does not offer sponsorship",
+      "not offer sponsorship",
+      "unable to offer sponsorship",
+      "cannot offer sponsorship",
+      "do not sponsor",
+      "does not sponsor",
+      "will not sponsor",
+      "cannot sponsor",
+      "unable to sponsor",
+      "not able to sponsor",
+      "sponsorship is not available",
+      "sponsorship will not be provided",
+      "not eligible for sponsorship",
+      "without requiring sponsorship",
+      "without the need for sponsorship",
+      "now or in the future without sponsorship"
+    ],
+    "work_permit_positive_phrases": [
+      "visa sponsorship available",
+      "sponsorship available",
+      "will sponsor",
+      "we sponsor",
+      "open to sponsorship",
+      "sponsorship is available",
+      "we offer sponsorship",
+      "visa sponsorship is available"
+    ]
   },
 
   "enrichment": {
@@ -38,5 +80,5 @@
     "zero_contact_behavior": "delete"
   },
 
-  "custom_fields_added": []
+  "custom_fields_added": ["work_authorization"]
 }

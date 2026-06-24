@@ -30,9 +30,9 @@ MASTER_CSV_NAME = "csm_jobs.csv"
 
 # ---------------------------------------------------------------------------
 # CANONICAL COLUMN ORDER — the one and only schema.
-# Columns 1–17 are written by the SCRAPER skill.
-# Columns 18–34 are written by the ENRICHMENT skill.
-# discovered_execs (35) is written by the DASHBOARD (Hunter.io lookups).
+# Columns 1–18 are written by the SCRAPER skill.
+# Columns 19–35 are written by the ENRICHMENT skill.
+# discovered_execs (36) is written by the DASHBOARD (Hunter.io lookups).
 # ---------------------------------------------------------------------------
 CANONICAL_COLUMNS = [
     # --- scraper fields ---
@@ -46,6 +46,7 @@ CANONICAL_COLUMNS = [
     "company_size",
     "job_location",
     "salary",
+    "work_authorization",
     "applicant_count",
     "easy_apply",
     "linkedin_job_url",
