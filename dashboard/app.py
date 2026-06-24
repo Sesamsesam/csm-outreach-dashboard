@@ -18,6 +18,62 @@ BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
 CSV_PATH    = os.path.join(BASE_DIR, "..", "csm_jobs.csv")
 CL_DIR      = os.path.join(BASE_DIR, "..", "cover_letters")
 KEY_PATH    = os.path.join(BASE_DIR, ".hunter_key")
+CONFIG_PATH = os.path.join(BASE_DIR, "..", "search_config.json")
+CONFIG_EXAMPLE_PATH = os.path.join(BASE_DIR, "..", "search_config.example.json")
+
+
+def read_search_config():
+    """Load the single source of truth for what the skills scrape/enrich.
+
+    Prefers the live, user-edited search_config.json. Falls back to the shipped
+    search_config.example.json (CSM defaults) so a fresh clone still shows settings.
+    Returns (config_dict_or_None, source_label).
+    """
+    for path, label in ((CONFIG_PATH, "live"), (CONFIG_EXAMPLE_PATH, "default")):
+        if os.path.exists(path):
+            try:
+                with open(path, encoding="utf-8") as f:
+                    return json.load(f), label
+            except (ValueError, OSError):
+                continue
+    return None, "none"
+
+
+def search_config_summary():
+    """Flatten the search config into labeled rows for the dashboard panel.
+
+    Returns (rows, meta) where rows is a list of (label, value) pairs the user
+    can read at a glance, and meta carries the source ("live"/"default"/"none")
+    and the role label / last-updated date.
+    """
+    cfg, source = read_search_config()
+    if not cfg:
+        return [], {"source": "none", "role": "Customer Success Manager (built-in default)", "updated": ""}
+
+    s = cfg.get("scraper", {})
+    e = cfg.get("enrichment", {})
+    tiers = ", ".join(t.get("type", "") for t in e.get("contact_tiers", [])) or "-"
+    rows = [
+        ("Role / keywords",   (s.get("search_keywords") or "").replace("+", " ")),
+        ("Title must contain", s.get("title_match_phrase", "")),
+        ("Location",          (s.get("location") or "").replace("+", " ")),
+        ("Work type",         s.get("work_type_label", "")),
+        ("Seniority",         s.get("seniority_label", "")),
+        ("Posted within",     s.get("recency_label", "")),
+        ("Pages scraped",     str(s.get("pages_to_scrape", ""))),
+        ("Contacts per job",  str(e.get("num_contacts", ""))),
+        ("Contact tiers",     tiers),
+        ("Outreach tone",     e.get("dm_tone", "")),
+    ]
+    custom = cfg.get("custom_fields_added") or []
+    if custom:
+        rows.append(("Custom fields", ", ".join(custom)))
+    meta = {
+        "source":  source,
+        "role":    cfg.get("role_label", ""),
+        "updated": cfg.get("last_updated", ""),
+    }
+    return rows, meta
 
 
 def get_hunter_key():
@@ -250,6 +306,29 @@ BASE_HTML = """
                 color: var(--ink-soft); font-weight: 600; margin-top: 5px; }
     .tab-card.active .tab-name { color: var(--brand); }
 
+    /* Current search settings panel */
+    .search-settings { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+    .search-settings > summary { list-style: none; cursor: pointer; padding: 13px 18px;
+        font-size: .82rem; font-weight: 600; color: var(--ink); display: flex; align-items: center; gap: 8px; }
+    .search-settings > summary::-webkit-details-marker { display: none; }
+    .search-settings > summary::after { content: "\\F282"; font-family: "bootstrap-icons";
+        margin-left: auto; color: var(--ink-faint); font-weight: 400; transition: transform .15s; }
+    .search-settings[open] > summary::after { transform: rotate(180deg); }
+    .ss-role { font-weight: 500; color: var(--ink-soft); }
+    .ss-badge { font-size: .66rem; text-transform: uppercase; letter-spacing: .4px; font-weight: 700;
+        padding: 2px 7px; border-radius: 20px; }
+    .ss-default { background: #eef1f4; color: var(--ink-soft); }
+    .ss-live { background: var(--brand-bg); color: var(--brand); }
+    .ss-updated { font-size: .7rem; color: var(--ink-faint); font-weight: 500; }
+    .ss-body { padding: 4px 18px 16px; }
+    .ss-note { font-size: .76rem; color: var(--ink-soft); margin-bottom: 12px; }
+    .ss-note code { background: #eef1f4; padding: 1px 5px; border-radius: 4px; font-size: .72rem; }
+    .ss-table { width: 100%; border-collapse: collapse; }
+    .ss-table td { padding: 6px 0; border-top: 1px solid var(--line); font-size: .8rem; vertical-align: top; }
+    .ss-table tr:first-child td { border-top: none; }
+    .ss-key { color: var(--ink-faint); width: 38%; font-weight: 600; padding-right: 12px; }
+    .ss-val { color: var(--ink); }
+
     /* Search */
     .search-wrap input { font-size: .85rem; border-radius: 8px; padding: .4rem .9rem; border: none; }
     .search-wrap button { border-radius: 8px; font-size: .82rem; }
@@ -335,6 +414,33 @@ INDEX_HTML = BASE_HTML.replace("{% block content %}{% endblock %}", """
   </a>
   {% endfor %}
 </div>
+
+<!-- Current search settings: what the skills (incl. scheduled scrapes) will target -->
+<details class="search-settings mb-4">
+  <summary>
+    <i class="bi bi-sliders me-1"></i>
+    Current search settings
+    <span class="ss-role">{{ cfg_meta.role }}</span>
+    {% if cfg_meta.source == 'default' %}
+      <span class="ss-badge ss-default">shipped default</span>
+    {% elif cfg_meta.source == 'live' %}
+      <span class="ss-badge ss-live">customized</span>
+    {% endif %}
+    {% if cfg_meta.updated %}<span class="ss-updated">updated {{ cfg_meta.updated }}</span>{% endif %}
+  </summary>
+  <div class="ss-body">
+    <p class="ss-note">
+      These are the knobs the scraper and enrichment skills load at the start of every run -
+      including scheduled scrapes. To change them, ask Claude to retarget your search (it edits
+      <code>search_config.json</code>). Existing jobs below are never removed when you change these.
+    </p>
+    <table class="ss-table">
+      {% for label, value in cfg_rows %}
+      <tr><td class="ss-key">{{ label }}</td><td class="ss-val">{{ value or '-' }}</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+</details>
 
 {% if not jobs %}
   <p class="text-muted mt-4 fst-italic">No jobs match your filters.</p>
@@ -697,6 +803,8 @@ def index():
     for j in jobs:
         j["_contacts"] = get_contacts(j)
 
+    cfg_rows, cfg_meta = search_config_summary()
+
     return render_template_string(
         INDEX_HTML,
         jobs=jobs,
@@ -705,6 +813,8 @@ def index():
         active_status=active_status,
         tabs=tabs,
         status_colors=STATUS_COLORS,
+        cfg_rows=cfg_rows,
+        cfg_meta=cfg_meta,
         request=request,
     )
 

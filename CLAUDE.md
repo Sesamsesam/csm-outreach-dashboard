@@ -28,6 +28,16 @@ The `.claude/skills/<name>/` folders are the **single source of truth**. The plu
 
 If the user says anything like "set this up", "get me started", "initialize this", or "install this" — run the setup steps below in order. This is the intended onboarding phrase for new users in Cowork.
 
+## ⚡ FIRST: check if setup is already complete
+
+**Before running ANY setup step, check for a `setup_complete.json` file in the project root.**
+
+- **If it exists** → setup has already been completed on this machine (likely by Claude Code, or by a previous Cowork run). **Do NOT re-run the setup steps.** Read the file, then tell the user something like: "This project was already set up by `{set_up_by}` on `{timestamp}`, so I'll skip setup." Then go straight to next actions: offer to run a scrape (`/linkedin-csm-scraper`), enrich (`/linkedin-csm-enrichment`), or open the dashboard (http://localhost:5001). This is the common case when Cowork opens a folder that Claude Code already initialized — both tools share this one folder, so the work is already done.
+- **If it does NOT exist** → this is a fresh setup. Run the setup steps below in order. The file is gitignored, so a fresh clone from GitHub will never have it — which is correct: a new user's machine genuinely needs setup. Every individual step is idempotent (check-then-act), so even a re-run is safe.
+- **Write the marker only at the very END of a fully successful setup.** Create `setup_complete.json` with: `set_up_by` (the tool doing setup, e.g. "Claude Code" or "Cowork"), `timestamp` (ISO 8601), `install_path`, and a `steps_completed` array. Writing it only on full success means "file exists = setup fully done"; a setup that dies partway leaves no marker, so the next run correctly resumes (safely, because steps are idempotent).
+
+> Why this exists: Claude Code and Cowork share the same project folder. Whichever tool runs setup first writes the marker; the other tool sees it and skips straight to real work instead of re-walking prerequisite checks. The marker guards against redundant work and confusing "setting up..." UX — the single-data-file rule (schema.py refusing to overwrite, helper scripts refusing other filenames) already protects your actual data.
+
 ## When a new user opens this project
 
 Run these steps **in order** to get them going. The user may be non-technical — do not tell them to open a terminal or run commands themselves. Run everything yourself. Only tell the user something if you need them to take a physical action (like clicking a button in a dialog).
@@ -181,6 +191,19 @@ This file is gitignored. The enrichment skill reads it for cover-letter signatur
 - In the dashboard, open any job → the **Hunter.io** sidebar → paste the API key.
 - The key saves to `dashboard/.hunter_key` (gitignored).
 
+### 7. Write the setup-complete marker (do this LAST, only after every step above succeeded)
+Create `setup_complete.json` in the project root so a second tool (e.g. Cowork) opening this same folder skips setup instead of re-running it. Only write it on full success — a partial setup should leave no marker. Example:
+```json
+{
+  "setup_complete": true,
+  "set_up_by": "Claude Code",
+  "timestamp": "2026-06-24T00:00:00Z",
+  "install_path": "/absolute/path/to/csm-outreach-dashboard",
+  "steps_completed": ["install_location_confirmed", "prerequisites_verified", "csv_created", "profile_saved", "dashboard_tested"]
+}
+```
+This file is gitignored, so it never ships in the repo — a fresh clone correctly has no marker and runs setup. See **⚡ FIRST: check if setup is already complete** above for how it's read on later runs.
+
 ## How the two skills work together
 
 1. **Scraper** finds new job postings on LinkedIn and **appends** them as new rows to `csm_jobs.csv` (scraper columns filled, enrichment columns blank). It de-dups by `job_id` using `seen_job_ids.txt`.
@@ -199,14 +222,19 @@ A scheduled scrape needs to drive a **logged-in LinkedIn browser** and write to 
 
 **Always required:** a scheduled run still needs a **logged-in LinkedIn session** in the browser Claude controls, the machine **awake**, and someone available if LinkedIn throws a login wall or CAPTCHA (the skills stop and ask in that case).
 
-## Retargeting to a different job title
+## Retargeting / changing the job search (trigger)
 
-If the user asks to track a different role (not CSM), **engage with them — don't guess.** Each skill's `SKILL.md` has a clearly marked **🎯 CUSTOMIZE** section listing exactly what to change:
+If the user wants to **change or add to** what the skills look for - a different role, a different location/remote/seniority/recency setting, a different outreach tone, a new filter, or capturing a brand-new field - **follow [`RETARGETING.md`](RETARGETING.md).** That file is the single entry point and works identically in Claude Code and Cowork (the Cowork plugin launchers delegate to the same `.claude/skills/` files it edits).
 
-- **Scraper**: search keywords, the title filter, and LinkedIn location/remote/seniority URL params.
-- **Enrichment**: the contact priority tiers, segment-keyword logic, People-tab search terms / function codes, and DM/cover-letter tone.
+**How it works:** all the knobs live in one config file, **`search_config.json`** (project root). Both skills load it at the start of every run - scheduled or on-demand - and use only its values for every scraping/enrichment decision. The role-specific strings inline in the skills are just defaults; the config always wins. So retargeting = **edit that one file**, and every future run (including scheduled scrapes) follows the new targeting. This is the one-way street: a scheduled task can never drift back to the old role, because it reads the same config the user just changed. The dashboard shows a "Current search settings" panel reading the same file, so the user always sees what the next run will do.
 
-Walk the user through each knob, confirm their preferences, edit the `SKILL.md` files accordingly, then tell them what changed. The CSV schema, the single-file rule, and the enrich/delete behavior never change — only the search and outreach wording.
+`RETARGETING.md` contains: the full knob reference (by config key), a plain-English interview flow, a "does this touch the CSV?" decision rule, and the safe procedure for additive changes (new column / new contact type). **Engage with the user - don't guess.**
+
+Files: `search_config.json` is the live, gitignored settings (personal targeting never ships); `search_config.example.json` is the committed Customer Success Manager default and the fallback a fresh clone uses.
+
+Two things that never change when retargeting:
+- **Forward-only.** Existing rows in `csm_jobs.csv` are never touched, re-filtered, or deleted to match new targeting - old jobs stay in the dashboard. The change affects future runs only.
+- **Still one data file**, and `csm_jobs.csv` is never renamed (the filename is an internal guardrail constant, not a role label).
 
 ## Notes for Claude
 
@@ -223,8 +251,12 @@ Walk the user through each knob, confirm their preferences, edit the `SKILL.md` 
 .
 ├── schema.py                 ← single source of truth for CSV columns
 ├── csm_jobs.csv              ← the ONE data file (gitignored; create via schema.py)
+├── RETARGETING.md            ← how to change/add search knobs (the retargeting flow)
+├── search_config.example.json ← shipped CSM default knobs (committed; the fallback)
+├── search_config.json        ← live user knob settings (gitignored; skills load this)
 ├── seen_job_ids.txt          ← scraper de-dup cache (gitignored)
 ├── user_profile.txt          ← name/email for cover letters (gitignored)
+├── setup_complete.json       ← per-machine setup marker (gitignored)
 ├── cover_letters/            ← generated cover letters (gitignored)
 ├── .claude/skills/           ← AUTHORITATIVE skills (auto-load in Claude Code)
 │   ├── linkedin-csm-scraper/     (SKILL.md + scripts/append_jobs.py)

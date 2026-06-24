@@ -1,13 +1,13 @@
 ---
 name: linkedin-csm-scraper
-description: Scrape LinkedIn for new Customer Success Manager job postings (US, remote, past 24 hours) and append them to a local CSV tracker. Use this skill when asked to run a job scrape, find new CSM jobs, check for new postings, or update the job tracker. Also use it when a scheduled task fires for the daily job search.
+description: Scrape LinkedIn for new job postings matching your configured search (ships tuned for Customer Success Manager) and append them to a local CSV tracker. Use this skill when asked to run a job scrape, find new jobs (CSM or any configured role), check for new postings, or update the job tracker. Also use it when a scheduled task fires for the daily job search.
 ---
 
 # LinkedIn CSM Job Scraper
 
 > **FORMATTING RULE - NO EM DASHES:** Never use em dashes (--) anywhere in any output - not in reports, summaries, or any other text. Use a regular hyphen (-) instead. This applies to every piece of text this skill generates, without exception.
 
-Scrapes LinkedIn for Customer Success Manager job postings and appends new entries to a local CSV, deduplicating by Job ID. Every step below reflects what was confirmed working in live testing - follow it exactly for repeatable results.
+Scrapes LinkedIn for job postings matching the configured search (loaded in Step 0a) and appends new entries to a local CSV, deduplicating by Job ID. Ships tuned for Customer Success Manager, but the skill text names no role - all targeting lives in the search config. Every step below reflects what was confirmed working in live testing - follow it exactly for repeatable results.
 
 ---
 
@@ -24,21 +24,20 @@ There is **exactly one** data file in this project: **`{project_root}/csm_jobs.c
 - **Schema (column definitions)**: `{project_root}/schema.py`
 - **Cache path**: `{project_root}/seen_job_ids.txt`
 - **Script path**: `<this skill's directory>/scripts/append_jobs.py`
-- **Pages to scrape**: Up to 3 pages (stop earlier if fewer results exist)
-- **Title filter**: Only process jobs where the title contains "Customer Success Manager" (case-insensitive). Longer titles like "Senior Customer Success Manager, Enterprise" are fine — include them. Skip everything else.
+- **Pages to scrape**: `{pages_to_scrape}` from the config (stop earlier if fewer results exist).
+- **Title filter**: Only process jobs whose title contains `{title_match_phrase}` from the config (case-insensitive). Longer titles that also contain the phrase are fine — include them. Skip everything else.
+
+> Everything role-specific in this skill is a code-word in `{curly braces}`, resolved from the search config loaded in **Step 0a**. The skill text never names a role itself - the config is the only legend.
 
 ---
 
 ## 🎯 CUSTOMIZE: targeting a different role
 
-This skill ships tuned for **Customer Success Manager** roles. If the user asks to track a different role (e.g. "Product Manager", "Account Executive", "Data Analyst"), **don't guess** — walk them through these knobs and confirm each before editing this file:
+This skill's behavior is driven entirely by the search config (the code-word legend) - **the skill text itself names no role.** To change or add to what gets scraped, **don't guess** — the single entry point is **`{project_root}/RETARGETING.md`**, and the change is a single edit to **`search_config.json`** (the menu card). Walk the user through it and confirm each change.
 
-1. **Search keywords** — the `keywords=` value in the Step 1 URLs (currently `Customer+Success+Manager`).
-2. **Title filter** — the phrase in the Configuration block above and the `.includes('customer success manager')` check in the Step 2 JavaScript (currently `customer success manager`).
-3. **Location / remote / seniority filters** — the URL params `location`, `f_WT` (2 = remote), and `f_E` (2,4 = entry/mid-senior). Ask the user their preference and adjust.
-4. **Report wording & examples** — update the CSM-specific examples in Step 6 to match the new role so reports read naturally.
+The scraper code-words (all documented in `RETARGETING.md` with their LinkedIn meaning) are: `search_keywords`, `title_match_phrase`, `location`, `work_type`, `seniority`, `recency`, `pages_to_scrape`, `blocklist_companies`, and `blocklist_phrases`. Capturing a brand-new field (a new CSV column) is the one case that also touches `schema.py` - see `RETARGETING.md`.
 
-The CSV schema, the de-dup logic, and the single-master-file rule **do not change** when retargeting — only the search/filter terms above. Make the edits, then tell the user what you changed so they can confirm.
+**Forward-only:** retargeting never touches rows already in `csm_jobs.csv` — old jobs stay in the tracker even if they no longer match the new knobs. The CSV schema, the de-dup logic, and the single-master-file rule **do not change** when retargeting — only the config values. After editing `search_config.json`, tell the user what changed.
 
 ---
 
@@ -46,17 +45,44 @@ The CSV schema, the de-dup logic, and the single-master-file rule **do not chang
 
 Skip any job where the posting company is a known aggregator or recruiter that hides the real employer. No row should be created for these — they're useless for outreach.
 
-**Skip by company name** (case-insensitive):
-Swooped, Ladders, Jobgether, Recruit.net, Jobot, Nexxt, Talentify, Employbl, Adzuna, Hirect, Sci-Rec
+- **Skip by company name** (case-insensitive): if the posting company matches any entry in `{blocklist_companies}` from the config.
+- **Skip by description text**: if the job description contains any phrase in `{blocklist_phrases}` from the config, it's a hidden-employer listing regardless of company name.
 
-**Skip by description text** — if the job description contains any of these phrases, it's a hidden-employer listing regardless of company name:
-- "currently partnered with"
-- "we are not the employer"
-- "on behalf of"
-- "our client is"
-- "confidential company"
+The actual company names and phrases live only in the config (`search_config.example.json` ships the defaults). Check both the company name AND description before processing a job.
 
-Check both the company name AND description before processing a job.
+---
+
+## ⚙️ Step 0a (DO THIS FIRST, before any browser navigation) — Load the search config
+
+**The search config is the single source of truth for what this skill scrapes. Every search/filter decision below uses these values, not the example values written inline.** This applies identically to on-demand runs and scheduled runs - both load the config first, so a scheduled scrape can never drift back to a previous role.
+
+Load it from the project root, preferring the live file and falling back to the shipped default:
+
+```bash
+python3 -c "
+import json, os
+root = os.environ.get('PROJECT_ROOT') or '{project_root}'
+for name in ('search_config.json', 'search_config.example.json'):
+    p = os.path.join(root, name)
+    if os.path.exists(p):
+        print(json.dumps(json.load(open(p))['scraper'])); break
+"
+```
+
+(`{project_root}` is the auto-located root - the folder containing `schema.py`.) From the returned `scraper` object, bind these code-words; every step below uses them as placeholders, never literal role values:
+
+| Code-word (config key) | Substituted into |
+|---|---|
+| `{search_keywords}` | the `keywords=` URL param (Step 1 + Step 3a) |
+| `{title_match_phrase}` | the title filter (Configuration + Step 2 JS) |
+| `{location}` | the `location=` URL param |
+| `{work_type}` | the `f_WT=` URL param (LinkedIn: on-site 1, remote 2, hybrid 3) |
+| `{seniority}` | the `f_E=` URL param (URL-encode any comma as `%2C`) |
+| `{recency}` | the `f_TPR=` URL param |
+| `{pages_to_scrape}` | how many pages to page through (Step 4) |
+| `{blocklist_companies}` / `{blocklist_phrases}` | the aggregator/recruiter blocklist (Step 3b) |
+
+**Hard rule:** the steps below contain **only code-words in `{curly braces}`** for anything role-specific - never a literal role name, keyword, or filter value. Always substitute the value loaded from the config. Never scrape for a role the config does not specify. The config is the only place the actual values live (the live `search_config.json`, or the committed `search_config.example.json` default). If **neither** file exists, stop and tell the user the search config is missing - do not invent values.
 
 ---
 
@@ -72,11 +98,13 @@ If the file doesn't exist yet, treat seen_ids as an empty set and continue.
 
 ## Step 1 — Navigate to each page
 
-Navigate to the search URL for the current page. Pages use the `start` parameter:
+Navigate to the search URL for the current page, **built from the code-words loaded in Step 0a** (substitute each `{...}` with its config value; URL-encode as needed). Pages use the `start` parameter:
 
-- Page 1: `https://www.linkedin.com/jobs/search/?keywords=Customer+Success+Manager&location=United+States&f_TPR=r86400&f_WT=2&f_E=2%2C4`
+- Page 1 (template): `https://www.linkedin.com/jobs/search/?keywords={search_keywords}&location={location}&f_TPR={recency}&f_WT={work_type}&f_E={seniority}`
 - Page 2: same URL with `&start=25`
 - Page 3: `&start=50`
+
+Page through `{pages_to_scrape}` pages total (see Step 4).
 
 Wait for the left panel job list to render before extracting. If LinkedIn shows a login page, stop and tell the user to log in first.
 
@@ -103,14 +131,15 @@ const deduped = jobs.filter(j => {
   seen.add(j.jobId);
   return true;
 });
-// Filter to CSM titles only
-const csm = deduped.filter(j =>
-  j.title.toLowerCase().includes('customer success manager')
+// Filter to matching titles only.
+// Substitute {title_match_phrase} below with the config value (lowercased), e.g. '...'.includes('{title_match_phrase}')
+const matched = deduped.filter(j =>
+  j.title.toLowerCase().includes('{title_match_phrase}')
 );
-JSON.stringify({ total: deduped.length, csm: csm.length, jobs: csm });
+JSON.stringify({ total: deduped.length, matched: matched.length, jobs: matched });
 ```
 
-Keep only the jobs in the `csm` array. Capture all IDs upfront — you'll use them to load each job directly without navigating back to this page.
+Before running the JS, replace `{title_match_phrase}` with the lowercased config value. Keep only the jobs in the `matched` array. Capture all IDs upfront — you'll use them to load each job directly without navigating back to this page.
 
 **Immediately filter out any job whose `jobId` is in `seen_ids` (loaded in Step 0).** Do not navigate to those jobs at all — they've already been processed in a previous run.
 
@@ -124,9 +153,9 @@ For each job ID from Step 2, follow this sequence exactly.
 
 **Do not use** `/jobs/view/{job_id}/` — that URL renders an empty shell.
 
-Load the job via the search URL with `currentJobId`:
+Load the job via the search URL with `currentJobId`, **using the same code-words as Step 1**:
 ```
-https://www.linkedin.com/jobs/search/?currentJobId={job_id}&f_E=2%2C4&f_TPR=r86400&f_WT=2&keywords=Customer%20Success%20Manager&location=United%20States
+https://www.linkedin.com/jobs/search/?currentJobId={job_id}&f_E={seniority}&f_TPR={recency}&f_WT={work_type}&keywords={search_keywords}&location={location}
 ```
 
 After navigating, call `get_page_text`. A successful load returns the `<article>` element with the full job description starting with "About the job". If the article is missing or shows only the job list (no right panel content), the job has expired or shifted pages — skip it and move on.
@@ -219,7 +248,7 @@ If `find` returns no result, leave `company_website` blank and continue.
 
 ## Step 4 — Paginate
 
-After processing all qualifying jobs from the current page, move to the next page using the `start` parameter (see Step 1). Repeat Steps 2–3 for up to 3 pages total. Stop early if a page returns 0 qualifying CSM jobs after the seen_ids filter.
+After processing all qualifying jobs from the current page, move to the next page using the `start` parameter (see Step 1). Repeat Steps 2–3 for up to `{pages_to_scrape}` pages total. Stop early if a page returns 0 qualifying jobs (matching `{title_match_phrase}`) after the seen_ids filter.
 
 ---
 
@@ -247,12 +276,12 @@ Use the actual absolute path to `scripts/append_jobs.py` inside this skill's dir
 
 Tell the user:
 - How many pages were scraped
-- How many total CSM jobs were found across all pages
+- How many total matching jobs were found across all pages
 - How many were skipped (aggregators/recruiters) and why
 - How many were added vs skipped as duplicates
 - Path to the updated CSV
 
-Example: "Scraped 2 pages. Found 18 CSM titles. Skipped 4 (Swooped ×2, Ladders, Sci-Rec). Added 11 new rows, 3 already in your tracker."
+Example: "Scraped 2 pages. Found 18 matching titles. Skipped 4 (2 aggregators, 2 recruiters). Added 11 new rows, 3 already in your tracker."
 
 ---
 

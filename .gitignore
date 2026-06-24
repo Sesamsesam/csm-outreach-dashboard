@@ -2,8 +2,17 @@
 csm_jobs.csv
 seen_job_ids.txt
 user_profile.txt
+
+# Live search targeting (the user's current knob settings). Gitignored so personal
+# targeting never ships; a fresh clone falls back to search_config.example.json (CSM).
+search_config.json
 cover_letters/*.txt
 cover_letters/*.md
+
+# Per-machine setup marker - written after a successful local setup so a second
+# tool (e.g. Cowork) opening the same folder skips setup instead of re-running it.
+# Must stay gitignored: a fresh clone should NOT inherit an "already set up" flag.
+setup_complete.json
 
 # API keys
 dashboard/.hunter_key

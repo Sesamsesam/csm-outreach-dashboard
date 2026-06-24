@@ -1,0 +1,42 @@
+{
+  "_README": "SINGLE SOURCE OF TRUTH for what the two skills scrape and enrich. This is the SHIPPED DEFAULT (Customer Success Manager). The live, user-edited copy is search_config.json (gitignored). The scraper and enrichment skills load the live config at the START of every run - scheduled or on-demand - and use ONLY these values for every scraping and enrichment decision. To retarget, follow RETARGETING.md, which edits the live search_config.json. Never edit knob values inline in the skills; edit them here.",
+  "last_updated": "2026-06-24",
+  "role_label": "Customer Success Manager",
+
+  "scraper": {
+    "search_keywords": "Customer+Success+Manager",
+    "title_match_phrase": "customer success manager",
+    "location": "United+States",
+    "work_type": "2",
+    "work_type_label": "remote only",
+    "seniority": "2,4",
+    "seniority_label": "entry + mid-senior",
+    "recency": "r86400",
+    "recency_label": "past 24 hours",
+    "pages_to_scrape": 3,
+    "blocklist_companies": ["Swooped", "Ladders", "Jobgether", "Recruit.net", "Jobot", "Nexxt", "Talentify", "Employbl", "Adzuna", "Hirect", "Sci-Rec"],
+    "blocklist_phrases": ["currently partnered with", "we are not the employer", "on behalf of", "our client is", "confidential company"]
+  },
+
+  "enrichment": {
+    "num_contacts": 4,
+    "role_function": "Customer Success",
+    "contact_tiers": [
+      { "n": 1, "type": "Recruiter", "who": "Person actively hiring for this role" },
+      { "n": 2, "type": "Hiring Manager", "who": "CS Director / Sr. Director overseeing the team" },
+      { "n": 3, "type": "Peer", "who": "Individual contributor on the same segment team" },
+      { "n": 4, "type": "Senior Business Leader", "who": "GM, VP, CRO, CCO or similar" }
+    ],
+    "recruiter_function_code": "12",
+    "function_code": "26",
+    "manager_title_keywords": "Director Manager Customer Success",
+    "segment_keywords": ["Strategic", "Enterprise", "Commercial", "SMB"],
+    "segment_fallback": "Senior Customer Success",
+    "senior_leader_titles": ["GM", "General Manager", "VP", "SVP", "EVP", "CRO", "CCO", "Chief", "President", "Head of Revenue", "Head of GTM"],
+    "dm_tone": "Warm and peer-to-peer. Reference the specific role and team. No hard sell.",
+    "cover_letter_emphasis": "Customer Success outcomes: retention, relationship management, driving product adoption.",
+    "zero_contact_behavior": "delete"
+  },
+
+  "custom_fields_added": []
+}

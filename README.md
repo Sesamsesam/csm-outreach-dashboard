@@ -122,7 +122,7 @@ Sign up free at [hunter.io](https://hunter.io) — 25 domain searches/month on t
 
 ## Privacy / what gets pushed
 
-Your data never goes to GitHub. The `.gitignore` excludes `csm_jobs.csv`, `seen_job_ids.txt`, `user_profile.txt`, your cover letters, and your API keys. Only the **framework** is shared — code, skills, `schema.py`, and docs. When someone clones the repo they get an empty, ready-to-use project; when you push, your personal job data and contacts stay on your machine.
+Your data never goes to GitHub. The `.gitignore` excludes `csm_jobs.csv`, `seen_job_ids.txt`, `user_profile.txt`, `search_config.json` (your personal search targeting), your cover letters, and your API keys. Only the **framework** is shared — code, skills, `schema.py`, the default `search_config.example.json`, and docs. When someone clones the repo they get an empty, ready-to-use project; when you push, your personal job data and contacts stay on your machine.
 
 ## File structure
 
@@ -130,6 +130,9 @@ Your data never goes to GitHub. The `.gitignore` excludes `csm_jobs.csv`, `seen_
 .
 ├── schema.py                 ← single source of truth for the CSV columns
 ├── csm_jobs.csv              ← your ONE data file (gitignored, created from schema.py)
+├── RETARGETING.md            ← how to change/add what the skills search for
+├── search_config.example.json ← shipped default search knobs (CSM)
+├── search_config.json        ← your live search knobs (gitignored; skills load this)
 ├── seen_job_ids.txt          ← scraper de-dup cache (gitignored)
 ├── user_profile.txt          ← your name/email for cover letters (gitignored)
 ├── cover_letters/            ← generated cover letters (gitignored)
