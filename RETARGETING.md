@@ -129,10 +129,10 @@ A knob is only "wired" when **every** place that needs to know about it has been
 
 | # | File | What to add | Why it is required |
 |---|---|---|---|
-| 1 | **`search_config.example.json`** | The new key (+ an optional `*_label` companion for display) under the right block (`scraper` or `enrichment`). Add a one-line note to `_filters_note` / `_README` if behavior is non-obvious. | This is the committed default **and** the fallback a fresh clone uses. The knob's real default lives here. |
+| 1 | **`search_config.example.json`** | The new key, **plus a `"<key>_label"` companion** if you want it shown in the dashboard (the panel auto-displays any knob that has one). Put it under the right block (`scraper` or `enrichment`). Add a one-line note to `_filters_note` / `_README` if behavior is non-obvious. | This is the committed default **and** the fallback a fresh clone uses. The knob's real default lives here, and the `_label` is what the dashboard panel shows. |
 | 2 | **`.claude/skills/<skill>/SKILL.md`** (scraper and/or enrichment) | (a) add the key to the **Step 0a "bind these code-words" table**; (b) reference it only as a `{code-word}` in the step that uses it - never inline a literal value; (c) state the **default-if-absent** behavior. | The skill only "sees" config keys it loads in Step 0a. A key the skill never binds is dead config. This is the step most often forgotten. |
 | 3 | **`RETARGETING.md`** (this file) | A row in the Config Reference table for the new key. | So the next retarget knows the knob exists and what it controls - keeps this guide self-complete. |
-| 4 | **`dashboard/app.py`** -> `search_config_summary()` | A `(label, value)` row reading the new key with `s.get("key", default)` (or `e.get(...)`). | The "Current search settings" panel is how the user confirms what the next run will do. Read defensively so older configs without the key still render. |
+| 4 | **`dashboard/app.py`** -> `search_config_summary()` *(usually automatic - no edit)* | If you gave the knob a `"<key>_label"` companion in step 1, the panel **auto-displays it** in the same style (label humanized from the key) - nothing to edit here. Only touch this file to give the knob a **custom icon**, a **fixed position** in the curated order, or **special formatting** (e.g. chips like `contact_tiers`): add it to `_SCRAPER_KNOBS` / `_ENRICHMENT_KNOBS`. | The "Current search settings" panel is how the user confirms what the next run will do. The auto-display reads the `_label`, so older configs without the key still render fine. |
 | 5 | *(only if the knob captures new per-job data)* **`schema.py` + migration** | A new CSV column. | Follow **Additive change: new captured field** below. A pure filter/search knob does **not** need a column; a "record X about each job" knob does. |
 
 ### The drift traps (read these every time)
@@ -146,7 +146,7 @@ A knob is only "wired" when **every** place that needs to know about it has been
 
 1. **Config loads:** run the Step 0a snippet (or `python3 -c "import json; print(json.load(open('search_config.example.json'))['scraper'])"`) and confirm the new key prints.
 2. **Skill binds it:** grep the skill for the `{code-word}` - it must appear in both the Step 0a table and the step that uses it.
-3. **Panel shows it:** load the dashboard (or call `search_config_summary()`) and confirm the new row renders with the expected value.
+3. **Panel shows it:** load the dashboard (or call `search_config_summary()`) and confirm the new row renders with the expected value. A knob with a `"<key>_label"` appears automatically; if it does not show, check the `_label` is non-empty and sits in the same block (`scraper`/`enrichment`).
 4. **(If a column was added)** confirm `python3 schema.py` reports the new count and a test append lands the value in the right column.
 
 Then report back: which knob, its default, and that existing rows were untouched.

@@ -39,12 +39,95 @@ def read_search_config():
     return None, "none"
 
 
-def search_config_summary():
-    """Flatten the search config into labeled rows for the dashboard panel.
+# Display spec for the "Current search settings" panel.
+# (config_key, display label, Bootstrap icon) — order is left-to-right, wrapping.
+# Any OTHER knob that carries a "<key>_label" companion in the config is appended
+# automatically in the same style (see _auto_label_rows), so a brand-new knob shows
+# up in the panel without editing this file — just give it a "<key>_label".
+_SCRAPER_KNOBS = [
+    ("search_keywords",              "Role / keywords", "bi-briefcase"),
+    ("title_match_phrase",           "Title filter",    "bi-funnel"),
+    ("location",                     "Location",        "bi-geo-alt"),
+    ("work_type",                    "Work type",       "bi-laptop"),
+    ("seniority",                    "Seniority",       "bi-bar-chart-steps"),
+    ("recency",                      "Posted within",   "bi-clock-history"),
+    ("pages_to_scrape",              "Pages scraped",   "bi-layers"),
+    ("exclude_work_permit_required", "Work permit",     "bi-passport"),
+]
+_ENRICHMENT_KNOBS = [
+    ("num_contacts",  "Contacts per job", "bi-people"),
+    ("contact_tiers", "Contact tiers",    "bi-person-lines-fill"),
+    ("dm_tone",       "Outreach tone",    "bi-chat-quote"),
+]
+# Label-companion keys the curated knobs above already consume, so the
+# auto-discovery pass doesn't render them a second time.
+_CONSUMED_LABELS = {"work_type_label", "seniority_label", "recency_label", "work_permit_label"}
 
-    Returns (rows, meta) where rows is a list of (label, value) pairs the user
-    can read at a glance, and meta carries the source ("live"/"default"/"none")
-    and the role label / last-updated date.
+
+def _knob_row(block, key, label, icon):
+    """Resolve one knob into a display-row dict, or None if it has no value.
+
+    A "<key>_label" companion (the config's display convention) wins over the raw
+    value so the panel shows human-readable text. contact_tiers renders as chips;
+    num_contacts as "N per job"; the work-permit toggle as plain text.
+    """
+    if key == "contact_tiers":
+        chips = [t.get("type", "") for t in block.get(key, []) if t.get("type")]
+        if not chips:
+            return None
+        return {"icon": icon, "label": label, "value": "", "chips": chips}
+    if key == "num_contacts":
+        n = block.get(key, "")
+        if n == "" or n is None:
+            return None
+        return {"icon": icon, "label": label, "value": f"{n} per job", "chips": None}
+    if key == "exclude_work_permit_required":
+        value = (block.get("work_permit_label")
+                 or ("Skip jobs that won't sponsor" if block.get(key) else "Off"))
+        return {"icon": icon, "label": label, "value": value, "chips": None}
+
+    value = block.get(f"{key}_label") or block.get(key, "")
+    if key in ("search_keywords", "location"):
+        value = str(value).replace("+", " ")
+    value = str(value).strip()
+    if not value:
+        return None
+    return {"icon": icon, "label": label, "value": value, "chips": None}
+
+
+def _auto_label_rows(block, curated_keys):
+    """Surface any NEW knob that carries a "<key>_label" companion.
+
+    This is what makes the panel self-updating: when a retarget adds a brand-new
+    knob with a human-readable "<key>_label", it appears here automatically, in the
+    same style, with no edit to this file. Plumbing keys (function codes, phrase
+    lists, blocklists) have no _label, so they correctly stay hidden.
+    """
+    rows = []
+    for k, v in block.items():
+        if not k.endswith("_label") or k in _CONSUMED_LABELS:
+            continue
+        base = k[: -len("_label")]
+        if base in curated_keys:
+            continue
+        text = str(v).strip()
+        if not text:
+            continue
+        label = base.replace("_", " ").strip().capitalize()
+        rows.append({"icon": "bi-sliders", "label": label, "value": text, "chips": None})
+    return rows
+
+
+def search_config_summary():
+    """Flatten the search config into display rows for the dashboard panel.
+
+    Returns (rows, meta). Each row is a dict {icon, label, value, chips}: chips is a
+    list (rendered as pills) or None (then `value` is shown). meta carries the source
+    ("live"/"default"/"none"), the role label, and the last-updated date.
+
+    Rows = curated scraper knobs, then any auto-discovered new scraper knob, then the
+    curated enrichment knobs, their auto-discovered extras, and finally any custom
+    captured fields. A new labeled knob appears here with no code change.
     """
     cfg, source = read_search_config()
     if not cfg:
@@ -52,27 +135,27 @@ def search_config_summary():
 
     s = cfg.get("scraper", {})
     e = cfg.get("enrichment", {})
-    tiers = ", ".join(t.get("type", "") for t in e.get("contact_tiers", [])) or "-"
-    rows = [
-        ("Role / keywords",   (s.get("search_keywords") or "").replace("+", " ")),
-        ("Title must contain", s.get("title_match_phrase", "")),
-        ("Location",          (s.get("location") or "").replace("+", " ")),
-        ("Work type",         s.get("work_type_label", "")),
-        ("Seniority",         s.get("seniority_label", "")),
-        ("Posted within",     s.get("recency_label", "")),
-        ("Work permit filter", "Skip jobs that won't sponsor" if s.get("exclude_work_permit_required") else "Off"),
-        ("Pages scraped",     str(s.get("pages_to_scrape", ""))),
-        ("Contacts per job",  str(e.get("num_contacts", ""))),
-        ("Contact tiers",     tiers),
-        ("Outreach tone",     e.get("dm_tone", "")),
-    ]
-    custom = cfg.get("custom_fields_added") or []
-    if custom:
-        rows.append(("Custom fields", ", ".join(custom)))
+
+    rows = []
+    for key, label, icon in _SCRAPER_KNOBS:
+        row = _knob_row(s, key, label, icon)
+        if row:
+            rows.append(row)
+    rows += _auto_label_rows(s, {k for k, _, _ in _SCRAPER_KNOBS})
+
+    for key, label, icon in _ENRICHMENT_KNOBS:
+        row = _knob_row(e, key, label, icon)
+        if row:
+            rows.append(row)
+    rows += _auto_label_rows(e, {k for k, _, _ in _ENRICHMENT_KNOBS})
+
     meta = {
         "source":  source,
         "role":    cfg.get("role_label", ""),
         "updated": cfg.get("last_updated", ""),
+        # Names of extra columns recorded per job. NOT search knobs — shown as a
+        # caption below the grid, not as a tunable setting.
+        "captured_fields": list(cfg.get("custom_fields_added") or []),
     }
     return rows, meta
 
@@ -273,6 +356,12 @@ BASE_HTML = """
     .job-meta { font-size: .78rem; color: var(--ink-faint); }
     .job-contacts { font-size: .78rem; color: var(--ink-soft); }
     .job-foot { font-size: .74rem; color: var(--ink-faint); }
+    /* Hard-requirements line on a job card — always shown, so the absence of a
+       gate (a degree/license you can't bend around) is itself a signal. */
+    .job-hardreq { font-size: .76rem; line-height: 1.4; }
+    .job-hardreq.has-req { color: #8a6400; display: -webkit-box; -webkit-line-clamp: 2;
+                           -webkit-box-orient: vertical; overflow: hidden; }
+    .job-hardreq.no-req { color: var(--ink-faint); }
 
     /* Cover letter — flat text, no surrounding box */
     .cover-letter { font-size: .88rem; white-space: pre-wrap; line-height: 1.7; color: var(--ink); }
@@ -324,15 +413,28 @@ BASE_HTML = """
     .ss-body { padding: 4px 18px 16px; }
     .ss-note { font-size: .76rem; color: var(--ink-soft); margin-bottom: 12px; }
     .ss-note code { background: #eef1f4; padding: 1px 5px; border-radius: 4px; font-size: .72rem; }
-    /* Responsive grid of compact label-over-value cells, so the value sits
-       right under its label instead of across a wide row. */
-    .ss-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    /* Full-width auto-flowing grid: cells stretch to fill the row, then wrap to
+       the next. Adding a knob to the config slots it in here in the same style. */
+    .ss-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
         gap: 1px; background: var(--line); border: 1px solid var(--line);
         border-radius: 8px; overflow: hidden; }
-    .ss-item { background: var(--surface); padding: 9px 13px; }
-    .ss-key { display: block; font-size: .67rem; text-transform: uppercase; letter-spacing: .4px;
+    .ss-item { background: var(--surface); padding: 11px 14px;
+        display: flex; gap: 10px; align-items: flex-start; }
+    .ss-item > i { color: var(--ink-faint); font-size: .95rem; line-height: 1.3;
+        margin-top: 1px; width: 16px; text-align: center; flex: none; }
+    .ss-cell { min-width: 0; }
+    .ss-key { display: block; font-size: .65rem; text-transform: uppercase; letter-spacing: .4px;
         color: var(--ink-faint); font-weight: 700; margin-bottom: 3px; }
-    .ss-val { font-size: .82rem; color: var(--ink); line-height: 1.3; }
+    .ss-val { font-size: .84rem; color: var(--ink); line-height: 1.35; font-weight: 500;
+        overflow-wrap: anywhere; }
+    .ss-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+    .ss-chip { font-size: .72rem; font-weight: 600; background: var(--brand-bg); color: var(--brand);
+        padding: 2px 9px; border-radius: 20px; }
+    /* "Also captured per job" — informational, NOT a search knob, so it sits
+       below the grid as a caption rather than inside it. */
+    .ss-captured { display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+        margin-top: 12px; font-size: .76rem; color: var(--ink-soft); }
+    .ss-captured-label { color: var(--ink-faint); margin-right: 2px; }
 
     /* Search */
     .search-wrap input { font-size: .85rem; border-radius: 8px; padding: .4rem .9rem; border: none; }
@@ -440,13 +542,28 @@ INDEX_HTML = BASE_HTML.replace("{% block content %}{% endblock %}", """
       <code>search_config.json</code>). Existing jobs below are never removed when you change these.
     </p>
     <div class="ss-grid">
-      {% for label, value in cfg_rows %}
+      {% for row in cfg_rows %}
       <div class="ss-item">
-        <span class="ss-key">{{ label }}</span>
-        <span class="ss-val">{{ value or '-' }}</span>
+        <i class="bi {{ row.icon }}" aria-hidden="true"></i>
+        <div class="ss-cell">
+          <span class="ss-key">{{ row.label }}</span>
+          {% if row.chips %}
+          <span class="ss-chips">
+            {% for chip in row.chips %}<span class="ss-chip">{{ chip }}</span>{% endfor %}
+          </span>
+          {% else %}
+          <span class="ss-val">{{ row.value or '-' }}</span>
+          {% endif %}
+        </div>
       </div>
       {% endfor %}
     </div>
+    {% if cfg_meta.captured_fields %}
+    <div class="ss-captured">
+      <span class="ss-captured-label">Also captured per job:</span>
+      {% for f in cfg_meta.captured_fields %}<span class="ss-chip">{{ f.replace('_', ' ') }}</span>{% endfor %}
+    </div>
+    {% endif %}
   </div>
 </details>
 
@@ -465,13 +582,24 @@ INDEX_HTML = BASE_HTML.replace("{% block content %}{% endblock %}", """
       {{ job.job_location }}
     </div>
     {% set contacts = job._contacts %}
-    <div class="mb-3">
+    <div class="mb-2">
     {% if contacts %}
       <div class="job-contacts">
         <i class="bi bi-people me-1"></i>{{ contacts|map(attribute='name')|join(', ') }}
       </div>
     {% else %}
       <div class="no-contacts" style="font-size:.78rem">No contacts yet</div>
+    {% endif %}
+    </div>
+    <div class="mb-3">
+    {% if job.hard_requirements %}
+      <div class="job-hardreq has-req">
+        <i class="bi bi-mortarboard-fill me-1"></i>{% for r in job.hard_requirements.split(';') if r.strip() %}{{ r.strip() }}{% if not loop.last %} · {% endif %}{% endfor %}
+      </div>
+    {% else %}
+      <div class="job-hardreq no-req">
+        <i class="bi bi-check2 me-1"></i>No hard requirements
+      </div>
     {% endif %}
     </div>
     <div class="d-flex justify-content-between align-items-center mt-auto pt-2"
@@ -569,13 +697,13 @@ JOB_HTML = BASE_HTML.replace("{% block content %}{% endblock %}", """
       </div>
     </div>
 
-    <!-- Hard requirements (must-haves an applicant cannot bend, e.g. a specific degree, license, clearance) -->
-    {% if job.hard_requirements or job.years_experience %}
+    <!-- Hard requirements (must-haves an applicant cannot bend, e.g. a specific degree, license, clearance).
+         Always shown - the absence of a hard requirement is itself useful information. -->
     <div class="sidebar-card mb-3">
       <div class="sidebar-label mb-2">Hard Requirements</div>
       {% if job.years_experience %}
       <div class="mb-2" style="font-size:.82rem;color:#1a1a2e">
-        <i class="bi bi-clock-history me-1" style="color:var(--ink-faint)"></i>{{ job.years_experience }}
+        <i class="bi bi-clock-history me-1" style="color:var(--ink-faint)"></i>{{ job.years_experience }} <span style="color:var(--ink-faint)">(experience, not a hard gate)</span>
       </div>
       {% endif %}
       {% if job.hard_requirements %}
@@ -583,10 +711,9 @@ JOB_HTML = BASE_HTML.replace("{% block content %}{% endblock %}", """
         {% for r in job.hard_requirements.split(';') %}{% if r.strip() %}<li>{{ r.strip() }}</li>{% endif %}{% endfor %}
       </ul>
       {% else %}
-      <div class="text-muted" style="font-size:.8rem;font-style:italic">No documentation-gated requirements flagged.</div>
+      <div class="text-muted" style="font-size:.8rem;font-style:italic">No hard requirements (nothing documentation-gated like a specific degree, license, or clearance).</div>
       {% endif %}
     </div>
-    {% endif %}
 
     <!-- Status -->
     <div class="sidebar-card">
