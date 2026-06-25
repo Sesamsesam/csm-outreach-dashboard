@@ -122,7 +122,7 @@ What can be changed:
 
 The CSV schema, the de-duplication, the "enrich anything not yet enriched" behavior, and the single-data-file rule **stay the same** — only the search and outreach wording changes.
 
-## Cowork project prompt (recommended)
+## Cowork project prompt (recommended) 👈 🚨
 
 If you're using this project in **Cowork**, paste the following into your **project prompt** (Project Settings → Project Prompt). This ensures Claude always handles your requests correctly — even when you describe changes casually:
 
