@@ -290,7 +290,9 @@ Use the actual absolute path to `scripts/append_jobs.py` inside this skill's dir
 
 ---
 
-## Step 6 — Report back
+## Step 6 — Report scrape results (this is NOT the end - enrichment follows immediately)
+
+Give a brief summary of the scrape. **Do NOT end your turn here - Step 7 is mandatory and must happen in the same response.** This is a mid-flow status update, not a stopping point.
 
 Tell the user:
 - How many pages were scraped
@@ -298,15 +300,18 @@ Tell the user:
 - How many were skipped (aggregators/recruiters) and why
 - How many were skipped by the work-permit filter (Step 3g) and why
 - How many were added vs skipped as duplicates
-- Path to the updated CSV
 
-Example: "Scraped 2 pages. Found 18 matching titles. Skipped 4 (2 aggregators, 2 recruiters), 1 that won't sponsor. Added 11 new rows, 2 already in your tracker."
+Example: "Scraped 2 pages. Found 18 matching titles. Skipped 4 (2 aggregators, 2 recruiters), 1 that won't sponsor. Added 11 new rows, 2 already in your tracker. Now enriching these rows with contacts and outreach..."
 
-## Step 7 — Automatically run enrichment
+**Then immediately continue to Step 7. Do not wait for user input.**
 
-**Do not ask the user whether to enrich. Always proceed immediately.**
+## Step 7 — Automatically run enrichment (MANDATORY - DO NOT STOP HERE)
 
-After reporting the scrape results, run the enrichment skill (`/linkedin-csm-enrichment` in Claude Code, or follow `.claude/skills/linkedin-csm-enrichment/SKILL.md` in Cowork) to enrich every row that hasn't been enriched yet. The scraper and enrichment skills are designed to run in tandem - scrape first, then enrich - as a single uninterrupted flow. Never stop between them to ask for confirmation.
+**⚠️ CRITICAL: Do NOT stop, pause, wait for user input, or end your turn after reporting scrape results. You MUST immediately proceed to enrichment in the same response - no exceptions. This applies to on-demand runs, scheduled runs, and every other context. Stopping here breaks the scheduled workflow.**
+
+**Do not ask the user whether to enrich. Do not say "just a moment" and then wait. Do not end your message after the scrape report. Immediately - in the same turn, with no interruption - begin the enrichment skill.**
+
+After reporting the scrape results (Step 6), continue directly in the same response to run the enrichment skill (`/linkedin-csm-enrichment` in Claude Code, or follow `.claude/skills/linkedin-csm-enrichment/SKILL.md` in Cowork) to enrich every row that hasn't been enriched yet. The scraper and enrichment skills are designed to run as a single uninterrupted flow. Treat Steps 1-7 and the entire enrichment process as one atomic operation - there is no stopping point between scraping and enriching.
 
 ---
 
