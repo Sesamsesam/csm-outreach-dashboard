@@ -9,6 +9,22 @@ A local job-outreach tracker for Customer Success Manager roles. Scrape LinkedIn
 - **Hunter.io integration** - find executive emails by company domain (25 free searches/month).
 - **One local data file** - `csm_jobs.csv`. No cloud, no database, no accounts.
 
+## 👩‍💻 Launch the dashboard
+
+Once everything is installed, open Terminal (Mac) or Command Prompt (Windows), navigate to the project folder, and run:
+
+**Mac / Linux:**
+```bash
+bash dashboard/run.sh
+```
+
+**Windows:**
+```
+dashboard\run.bat
+```
+
+Then open **http://localhost:5001** in your browser - that's your dashboard.
+
 ## How the pieces fit together
 
 ```
