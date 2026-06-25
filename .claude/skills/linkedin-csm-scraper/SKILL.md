@@ -154,6 +154,10 @@ Before running the JS, replace `{title_match_phrase}` with the lowercased config
 
 For each job ID from Step 2, follow this sequence exactly.
 
+### Rate-limit guard
+
+**Before navigating to each job (except the first one), wait 2 seconds.** This prevents LinkedIn from throttling rapid back-to-back job detail requests, which causes right panels to return blank. The pause is mandatory on every run - do not skip it to save time.
+
 ### 3a — Load the job detail
 
 **Do not use** `/jobs/view/{job_id}/` — that URL renders an empty shell.
