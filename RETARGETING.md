@@ -153,6 +153,25 @@ Then report back: which knob, its default, and that existing rows were untouched
 
 ---
 
+## Filtering on education / a degree (read before building a degree filter)
+
+A common request is **"don't show me jobs that require a degree I don't have."** This is easy to implement in a way that **silently hides jobs the user is actually qualified for** - so handle it carefully.
+
+The trap: **most postings just say "Bachelor's degree required" with no field.** Any applicant with *any* 4-year degree satisfies that. If the filter naively skips every posting that mentions "degree," it will exclude jobs the user fully qualifies for, just because they don't have that *exact* generic phrasing - or worse, it starts matching only the user's specific degree and drops all the any-degree jobs.
+
+Do this instead:
+
+1. **Ask the user what their degree is** - both level (e.g. Bachelor's, Master's, none) and field (e.g. Marketing). Do not assume.
+2. **Keep** a job when it: (a) permits **any degree** (generic "Bachelor's required", no field), **or** (b) names the **user's own degree**, **or** (c) names a **similar/related field** the user reasonably falls within.
+3. **Exclude** a job **only** when it requires a **specific degree or credential** the user does **not** hold and **cannot** reasonably fall within (e.g. "Bachelor's in Nursing" / "Active RN license" for someone without it).
+4. **Never exclude a job merely because it mentions a degree.** The mismatch must be *specific and disqualifying*.
+
+This lines up with how the scraper records `hard_requirements`: a generic "Bachelor's degree" (no field) is **not** flagged as a hard requirement, only a field-specific degree is. So a degree filter should key off the *specific-field* hard requirements, never a bare "has a degree" mention.
+
+Like every filter, this is **config-only and forward-only** - it skips *future* jobs, never deletes existing rows, and adds no CSV column.
+
+---
+
 ## Additive change: new captured field (the only CSV-touching case)
 
 If the user wants to **start capturing a field that does not exist yet** (e.g. "also record whether the job mentions visa sponsorship", or add a 5th contact `contact5_*`):
