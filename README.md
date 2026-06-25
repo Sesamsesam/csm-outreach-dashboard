@@ -107,14 +107,32 @@ This project ships tuned for **Customer Success Manager** roles, but the skills 
 
 > "Change these skills to track Account Executive jobs instead of CSM."
 
-Claude will walk you through the handful of knobs that need to change and confirm each one before editing:
+You can also change individual settings in plain language:
 
+> "Search United Kingdom instead of US"
+> "Show me hybrid jobs too, not just remote"
+> "Make the DMs more formal"
+> "Only show me senior roles"
+
+Claude will confirm what you mean, make the change in the config file, and tell you what it did. All changes live in one file (`search_config.json`) and take effect on the next run — no reinstall or rebuild needed.
+
+What can be changed:
 - **Scraper** — the search keywords, the job-title filter, and the LinkedIn location/remote/seniority filters.
 - **Enrichment** — the contact tiers (who Contacts 2–4 should be for the new function), the People-tab search terms and function codes, and the DM/cover-letter tone.
 
-The CSV schema, the de-duplication, the "enrich anything not yet enriched" behavior, and the single-data-file rule **stay the same** — only the search and outreach wording changes. Each skill has a clearly marked **🎯 CUSTOMIZE** section at the top documenting exactly what to edit, so the change is safe and contained.
+The CSV schema, the de-duplication, the "enrich anything not yet enriched" behavior, and the single-data-file rule **stay the same** — only the search and outreach wording changes.
 
-Edits go in `.claude/skills/<skill-name>/SKILL.md` — the one place each skill lives. Both Claude Code and Cowork read these same files, so an edit applies everywhere.
+## Cowork project prompt (recommended)
+
+If you're using this project in **Cowork**, paste the following into your **project prompt** (Project Settings → Project Prompt). This ensures Claude always handles your requests correctly — even when you describe changes casually:
+
+> The users of this project are not technical and did not build it. They will describe changes in casual, everyday language — "search UK", "look for PM jobs", "make the DMs shorter", "only senior roles." They do not know the config structure, skill names, or technical terms like "retarget" or "knob."
+>
+> When they ask to change anything about what jobs are searched, where they're searched, what filters apply, who gets contacted, or how outreach is written, that is a settings change — not a request to run a scrape or enrichment. Confirm what they mean in plain language, then read CLAUDE.md (specifically the "Recognizing a settings change" section) and follow the retargeting procedure in RETARGETING.md. All config changes go in search_config.json, never in skill files.
+>
+> When they ask to run a search, find new jobs, enrich, or do their daily job search — that is a run request. Use the skills as normal.
+>
+> If you're unsure whether they want a settings change or a run, ask a short clarifying question.
 
 ## Hunter.io (optional)
 

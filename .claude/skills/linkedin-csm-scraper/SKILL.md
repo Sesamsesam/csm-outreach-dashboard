@@ -33,6 +33,8 @@ There is **exactly one** data file in this project: **`{project_root}/csm_jobs.c
 
 ## 🎯 CUSTOMIZE: targeting a different role
 
+> **STOP - is the user asking to change settings, or to run a scrape?** If the user said something like "search UK", "look for PM jobs", "only remote", "only senior roles", or anything about changing *what* gets searched - **do not run this skill.** That is a settings change. Follow `{project_root}/RETARGETING.md` (or see `CLAUDE.md` → "Recognizing a settings change") to update `search_config.json`, then confirm the change. Only run this skill when the user wants to execute a search with the current settings.
+
 This skill's behavior is driven entirely by the search config (the code-word legend) - **the skill text itself names no role.** To change or add to what gets scraped, **don't guess** — the single entry point is **`{project_root}/RETARGETING.md`**, and the change is a single edit to **`search_config.json`** (the menu card). Walk the user through it and confirm each change.
 
 The scraper code-words (all documented in `RETARGETING.md` with their LinkedIn meaning) are: `search_keywords`, `title_match_phrase`, `location`, `work_type`, `seniority`, `recency`, `pages_to_scrape`, `blocklist_companies`, `blocklist_phrases`, `exclude_work_permit_required`, `work_permit_block_phrases`, and `work_permit_positive_phrases`. Capturing a brand-new field (a new CSV column) is the one case that also touches `schema.py` - see `RETARGETING.md`.

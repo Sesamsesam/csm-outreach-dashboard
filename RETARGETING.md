@@ -29,10 +29,25 @@ So retargeting = **edit `search_config.json`** (create it by copying `search_con
 
 ---
 
+## Users speak casually - translate, don't ask them to learn the config
+
+The people using this project are not technical and did not build it. They will never say "change the `location` key" or "retarget the scraper." They will say "search United Kingdom" or "look for jobs in London." **Your job is to translate their plain language into the correct config key, confirm your understanding, and make the edit.**
+
+If the user has already told you what they want (e.g. "search UK instead"), do NOT ask them to "pick a knob" - just confirm: "I'll change the search location from United States to United Kingdom. That sound right?" Then do it.
+
+**Which block does their request touch?**
+- **Where / what / when to search** (location, role, seniority, remote, recency, filters) → `scraper` block
+- **Who to contact / how to write outreach** (DM tone, cover letter emphasis, contact types) → `enrichment` block
+- **Change the role entirely** (e.g. "search for Product Manager") → **both blocks** - update `role_label`, `search_keywords`, `title_match_phrase`, `role_function`, `manager_title_keywords`, `contact_tiers`, and `function_code` together. See the Config Reference below.
+
+See `CLAUDE.md` → **"Recognizing a settings change"** for a full table of example phrases mapped to config keys.
+
+---
+
 ## How to run a retargeting session
 
 1. **Read the current `search_config.json`** (or `search_config.example.json` if no live file exists yet) so you know the starting point.
-2. **Ask what they want to change or add.** Offer the knob list (the Config Reference below). Let them pick one knob, several, or "add something new."
+2. **Confirm your understanding of what they want.** If the user already told you (e.g. "search UK"), confirm in plain language ("I'll change the search location to United Kingdom - correct?"). If their request is vague, ask a short clarifying question. Do not present them with a list of config keys or technical options - keep it conversational.
 3. **Confirm the new values** in plain language before editing (e.g. "So: role = Account Executive, location = United States, remote only, posted in the last 7 days - correct?").
 4. **Decide if the CSV is affected** using the decision rule below. Almost everything is config-only.
 5. **Edit `search_config.json`** (create it from the example first if needed). Update `last_updated` to today. For label fields (`work_type_label`, `seniority_label`, `recency_label`), set a human-readable string so the dashboard panel reads well.

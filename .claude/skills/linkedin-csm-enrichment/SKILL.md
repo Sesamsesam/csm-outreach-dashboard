@@ -30,6 +30,8 @@ There is **exactly one** data file in this project: **`{project_root}/csm_jobs.c
 
 ## 🎯 CUSTOMIZE: targeting a different role
 
+> **STOP - is the user asking to change settings, or to run enrichment?** If the user said something like "make the DMs shorter", "be more formal", "don't contact recruiters", "focus the cover letter on sales", or anything about changing *how* outreach is written or *who* gets contacted - **do not run this skill.** That is a settings change. Follow `{project_root}/RETARGETING.md` (or see `CLAUDE.md` → "Recognizing a settings change") to update `search_config.json`, then confirm the change. Only run this skill when the user wants to execute enrichment with the current settings.
+
 This skill's behavior is driven entirely by the search config (the code-word legend) - **the skill text itself names no role.** To change or add to enrichment, **don't guess** — the single entry point is **`{project_root}/RETARGETING.md`**, and the change is a single edit to **`search_config.json`** (the menu card). Walk the user through it and confirm each change.
 
 The enrichment code-words (all documented in `RETARGETING.md`) are: `num_contacts`, `contact_tiers`, `role_function`, `recruiter_function_code`, `function_code`, `manager_title_keywords`, `segment_keywords`, `segment_fallback`, `senior_leader_titles`, `dm_tone`, `cover_letter_emphasis`, and `zero_contact_behavior`. Adding a 5th contact (a `contact5_*` slot) is the one case that also touches `schema.py` - see `RETARGETING.md`.

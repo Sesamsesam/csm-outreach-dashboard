@@ -2,15 +2,16 @@
 
 ## 📌 Read me first — house rules (Claude Code AND Cowork)
 
-**Any agent working in this project - Claude Code or Cowork - must follow these five rules before doing anything else.** They exist because the two tools share one folder, and inconsistency between them (re-running setup, rebuilding the plugin, making a second data file) is the main thing that breaks this project.
+**Any agent working in this project - Claude Code or Cowork - must follow these six rules before doing anything else.** They exist because the two tools share one folder, and inconsistency between them (re-running setup, rebuilding the plugin, making a second data file) is the main thing that breaks this project.
 
 1. **Setup is once.** If `setup_complete.json` exists in the project root, setup is already done - do **not** re-run it.
 2. **The plugin is an intentional thin launcher.** The file in `dist/` is short *by design*; it reads the project's live skills at runtime, so it is never stale. **Never "rebuild" or replace it with full skill content** - that breaks project-folder discovery.
 3. **One data file, ever.** There is exactly one: `csm_jobs.csv`. Never create a second CSV, never rename it.
 4. **Targeting lives in `search_config.json`.** To change what's searched/enriched (role, location, filters, contacts, tone), edit `search_config.json` - never hard-code role values into the skills. See `RETARGETING.md`.
 5. **Retargeting is forward-only.** Changing the search never deletes or re-filters existing rows in `csm_jobs.csv` - old jobs stay.
+6. **Users speak casually - recognize settings changes.** The people using this project are not technical and did not build it. They will describe changes in plain, everyday language - "search UK", "look for PM jobs", "make the DMs shorter", "only senior roles." If the user says anything that sounds like they want to change where, what, or how the skills search or write outreach, **that is a settings change** - do not run a scrape or enrichment. Instead, confirm what they want in plain language, then follow `RETARGETING.md`. See the **"Recognizing a settings change"** section below for examples.
 
-Everything below expands on these. When in doubt, these five win.
+Everything below expands on these. When in doubt, these six win.
 
 ---
 
@@ -238,9 +239,47 @@ A scheduled scrape needs to drive a **logged-in LinkedIn browser** and write to 
 
 **Always required:** a scheduled run still needs a **logged-in LinkedIn session** in the browser Claude controls, the machine **awake**, and someone available if LinkedIn throws a login wall or CAPTCHA (the skills stop and ask in that case).
 
-## Retargeting / changing the job search (trigger)
+## Recognizing a settings change (read this - users speak casually)
 
-If the user wants to **change or add to** what the skills look for - a different role, a different location/remote/seniority/recency setting, a different outreach tone, a new filter, **a brand-new knob**, or capturing a brand-new field - **follow [`RETARGETING.md`](RETARGETING.md).** That file is the single entry point and works identically in Claude Code and Cowork (the Cowork plugin launchers delegate to the same `.claude/skills/` files it edits).
+**The people using this project did not build it and do not know the config structure.** They will never say "change a knob" or "retarget the scraper." They will say things like the examples below. **Your job is to recognize these as settings changes, confirm what they mean, and then follow `RETARGETING.md` to make the change.** Do not run a scrape or enrichment when the user is asking for a settings change.
+
+### How to tell: is this a settings change or a "run" request?
+
+- **Settings change** = the user wants to change *what* gets searched, *where*, *how*, or *what the outreach sounds like*. Examples below. **Action:** confirm their intent in plain language, then follow `RETARGETING.md`.
+- **Run request** = the user wants to execute a search or enrichment *with the current settings*. Examples: "find new jobs", "run my daily search", "enrich the new rows." **Action:** run the relevant skill.
+
+If you're unsure, **ask a short clarifying question**: "Just to make sure - do you want me to change your search settings to [X], or run a search with your current settings?"
+
+### Example phrases and what they map to
+
+**Scraper settings** (where/what/when to search - `scraper` block in `search_config.json`):
+| User says something like... | Config key to change |
+|---|---|
+| "Search United Kingdom" / "Look for jobs in London" / "I moved to Germany" | `scraper.location` |
+| "Search for Product Manager instead" / "I want Account Executive roles" | `scraper.search_keywords` + `scraper.title_match_phrase` + `role_label` (and enrichment keys too - see "full role change" below) |
+| "Only remote" / "Show me hybrid too" / "I don't care about remote" | `scraper.work_type` + `scraper.work_type_label` |
+| "Only senior roles" / "Entry level only" / "I have 10 years experience" | `scraper.seniority` + `scraper.seniority_label` |
+| "Show me jobs from the last week" / "Not just today's posts" | `scraper.recency` + `scraper.recency_label` |
+| "More results" / "Search more pages" | `scraper.pages_to_scrape` |
+| "Skip jobs from [company]" / "Block this recruiter" | `scraper.blocklist_companies` |
+| "Don't filter out sponsorship jobs" / "I don't need a visa" | `scraper.exclude_work_permit_required` |
+
+**Enrichment settings** (who to contact / how to write - `enrichment` block in `search_config.json`):
+| User says something like... | Config key to change |
+|---|---|
+| "Make the DMs more formal" / "Be less salesy" / "Shorter messages" | `enrichment.dm_tone` |
+| "Focus the cover letter on sales" / "Emphasize leadership" | `enrichment.cover_letter_emphasis` |
+| "I don't want to reach out to recruiters" / "Add a VP of Sales contact" | `enrichment.contact_tiers` |
+| "Don't delete jobs with no contacts" / "Keep everything" | `enrichment.zero_contact_behavior` |
+
+**Full role change** (both blocks need updating together):
+If the user changes the *role itself* (e.g. "search for Product Manager instead of CSM"), this touches both the scraper block AND the enrichment block. Update all of these together: `role_label`, `scraper.search_keywords`, `scraper.title_match_phrase`, `enrichment.role_function`, `enrichment.manager_title_keywords`, `enrichment.contact_tiers`, and `enrichment.function_code`. See `RETARGETING.md` Config Reference for details.
+
+---
+
+## Retargeting / changing the job search (procedure)
+
+When you've recognized a settings change (above), **follow [`RETARGETING.md`](RETARGETING.md).** That file is the single entry point and works identically in Claude Code and Cowork (the Cowork plugin launchers delegate to the same `.claude/skills/` files it edits).
 
 > **Adding or changing a knob is never a one-off edit you improvise.** A knob can be wired in up to four places (the example config, the skill's Step 0a load table + the step that uses it, this guide's knob reference, and the dashboard panel) - skip one and the config drifts out of sync with what actually runs. `RETARGETING.md` has the exact, ordered checklist (**"Adding a brand-new knob: the full sync checklist"**) plus the drift traps (the live config is gitignored and per-user; never inline values in skills; never rebuild the plugin for a knob). Use it - do not guess the file list from memory.
 
