@@ -14,7 +14,7 @@
     "seniority_label": "entry + mid-senior",
     "recency": "r86400",
     "recency_label": "past 24 hours",
-    "pages_to_scrape": 3,
+    "pages_to_scrape": 1,
     "blocklist_companies": ["Swooped", "Ladders", "Jobgether", "Recruit.net", "Jobot", "Nexxt", "Talentify", "Employbl", "Adzuna", "Hirect", "Sci-Rec"],
     "blocklist_phrases": ["currently partnered with", "we are not the employer", "on behalf of", "our client is", "confidential company"],
 
