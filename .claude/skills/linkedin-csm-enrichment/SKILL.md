@@ -125,6 +125,39 @@ Base People tab URL: `https://www.linkedin.com/company/{slug}/people/`
 
 ---
 
+## ⏳ Page-ready gate (run after EVERY People-tab / profile navigation in Steps 4-7)
+
+LinkedIn renders People-tab results and profile pages **asynchronously, after the page load event**. Reading too early - the old "wait 2 seconds then read" - is the main cause of empty results and stuck panels: the people cards had not rendered yet. The fix is to **poll the DOM until results exist, then read** - never a fixed sleep.
+
+After every `navigate` in Steps 4-7, run this gate with the `javascript_tool` **before** `get_page_text` or JS extraction. Use `budgetMs` = **15000 on the first navigation of the run** (cold bootstrap is the slow one), **8000** afterwards (warm loads return in ~1-2s).
+
+```javascript
+await (async () => {
+  const budgetMs = 15000;            // FIRST navigation of the run; use 8000 afterwards
+  const t0 = performance.now();
+  const ready = () => document.querySelectorAll('.org-people-profile-card__profile-info').length > 0;  // People-tab predicate (Steps 4-6)
+  while (performance.now() - t0 < budgetMs) {
+    const spinner = document.querySelector('.artdeco-loader');
+    if (ready() && !spinner) return JSON.stringify({ ready: true, ms: Math.round(performance.now() - t0) });
+    await new Promise(r => setTimeout(r, 250));
+  }
+  return JSON.stringify({ ready: false, ms: Math.round(performance.now() - t0), reason: 'timeout' });
+})()
+```
+
+For **Step 7 (a person's profile page)** swap the `ready()` body for:
+```javascript
+const ready = () => !!document.querySelector('h1') && /experience|about|activity/i.test(document.body.innerText);
+```
+
+**Act on the result:**
+- `{"ready": true}` → extract immediately (warm: ~1-2s, so no fixed wait).
+- `{"ready": false, "reason": "timeout"}` → retry the navigation once and gate again. If it still times out, treat that tier as **0 results** and follow the step's 0-results path (it is genuinely empty or gated, not a render race).
+
+> This **replaces every "Wait 2 seconds"** in the steps below. Do not stack fixed sleeps on top of the gate.
+
+---
+
 ## Step 4 — Find Contact 1: Recruiter
 
 Navigate to (use `recruiter_function_code` from the config for `facetCurrentFunction`; default `12`):
@@ -132,7 +165,7 @@ Navigate to (use `recruiter_function_code` from the config for `facetCurrentFunc
 https://www.linkedin.com/company/{slug}/people/?keywords=recruiter+talent&facetCurrentFunction={recruiter_function_code}
 ```
 
-Wait 2 seconds. Call `get_page_text`. Parse the "People you may know" / results section for names and headlines.
+Run the **page-ready gate** (People-tab predicate), then call `get_page_text`. Parse the "People you may know" / results section for names and headlines.
 
 Then run JS to extract paths:
 ```javascript
@@ -171,7 +204,7 @@ This is the tier-2 contact from `{contact_tiers}`. Build the People-tab `keyword
   ```
   (no function filter — small orgs often don't segment by function)
 
-Wait 2 seconds. `get_page_text` to see results. Run the same JS as Step 4 to extract paths.
+Run the **page-ready gate**, then `get_page_text` to see results. Run the same JS as Step 4 to extract paths.
 
 **Selection rule**: Pick the most senior `{role_function}` person (rank: Sr. Director / VP > Director > Head of > Senior Manager). If multiple at same level, prefer someone whose title mentions the segment from Step 2.
 
@@ -190,7 +223,7 @@ https://www.linkedin.com/company/{slug}/people/?keywords={segment_keyword}&facet
 
 Where `{segment_keyword}` = what you extracted in Step 2.
 
-Wait 2 seconds. `get_page_text` + JS path extraction.
+Run the **page-ready gate**, then `get_page_text` + JS path extraction.
 
 **Selection rule**: Pick the first result whose headline contains the segment keyword AND `{role_function}`. Skip anyone with Director/Manager/Head titles (those belong in Contact 2). Prefer results showing a 2nd-degree connection indicator (they appear with "2nd" in the text).
 
@@ -202,7 +235,7 @@ Save as Contact 3.
 
 Navigate to Contact 2's LinkedIn profile (the hiring manager found in Step 5).
 
-Call `get_page_text`. Find the "More profiles for you" section near the bottom.
+Run the **page-ready gate** with the **profile predicate** (see the gate section), then call `get_page_text`. Find the "More profiles for you" section near the bottom.
 
 Parse for people whose titles match `{senior_leader_titles}` from the config. Exclude other `{role_function}` managers/directors — those are already covered by Contact 2.
 
@@ -364,7 +397,7 @@ Globex (3 contacts):
 
 ## Edge Cases
 
-- **0 results on People tab search**: Try removing the `facetCurrentFunction` parameter and retry. If still 0, skip that contact tier and move on.
+- **0 results on People tab search**: First make sure this is a true empty result, not an early read - the page-ready gate (run after the navigation) only reports `ready:true` once cards exist, so a gate timeout after one retry means genuinely 0. Then try removing the `facetCurrentFunction` parameter and retry. If still 0, skip that contact tier and move on.
 - **Zero contacts for the whole job** (no Contact 1 after every strategy): Follow `{zero_contact_behavior}` (Step 10) - `delete` removes the row with `--delete`, `keep` leaves it. The default `delete` avoids re-attempting empty rows on every future run.
 - **Acquired company / company page shows new brand**: Try the original slug anyway; if People tab is empty, search the new parent company's slug.
 - **Contact 2 profile shows no "More profiles for you"**: Skip Contact 4 for this job.

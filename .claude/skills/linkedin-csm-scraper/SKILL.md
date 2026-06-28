@@ -101,6 +101,41 @@ If the file doesn't exist yet, treat seen_ids as an empty set and continue.
 
 ---
 
+## ⏳ Page-ready gate (the reliability fix — run after EVERY navigation/click)
+
+LinkedIn renders the right-hand job panel (and the People tab) **asynchronously, after the page load event**. Reading too early - the old "wait 2-3 seconds then read" approach - is the single biggest cause of "blank panel / stuck loading": the content simply had not arrived yet. The fix is to **poll the DOM until the target content exists, then read** - never a fixed sleep.
+
+After every `navigate` (and every in-session card click), run this gate with the `javascript_tool` **before** calling `get_page_text` or extracting anything. Swap the `ready()` body for the per-step predicate given in each step. Set `budgetMs` to **15000 on the very first navigation of the run** (the cold SPA bootstrap is the slow one - it can take several seconds) and **8000** for every navigation after that (warm loads return in ~1-2s).
+
+```javascript
+await (async () => {
+  const budgetMs = 15000;            // FIRST navigation of the run; use 8000 afterwards
+  const t0 = performance.now();
+  const ready = () => {
+    // Per-step predicate - REPLACE this body (see each step). Shown: job-detail panel.
+    const art = document.querySelector('article')?.innerText || '';
+    const company = document.querySelector('.job-details-jobs-unified-top-card__company-name a')?.textContent?.trim();
+    return art.includes('About the job') && !!company;
+  };
+  while (performance.now() - t0 < budgetMs) {
+    const spinner = document.querySelector('.artdeco-loader, .jobs-search__job-details--loading');
+    if (ready() && !spinner) return JSON.stringify({ ready: true, ms: Math.round(performance.now() - t0) });
+    await new Promise(r => setTimeout(r, 250));
+  }
+  return JSON.stringify({ ready: false, ms: Math.round(performance.now() - t0), reason: 'timeout' });
+})()
+```
+
+**Act on the result:**
+- `{"ready": true}` → the content has rendered; read/extract immediately. Warm, this returns in ~1-2s, so you proceed the instant it is ready - you are not waiting a fixed block.
+- `{"ready": false, "reason": "timeout"}` → **one** retry: re-issue the same navigation (or click), then run the gate again. If it still times out, only then skip this item (genuinely expired/blocked) and move on.
+
+> This **replaces every fixed "wait N seconds"** in the steps below. Do not add fixed sleeps on top of the gate - it already waits exactly as long as needed and no longer.
+
+> **Optional, even smoother:** instead of navigating to a fresh `currentJobId` URL per job, you can stay on the search results page and **click each job card** in the left list. The right panel then updates in-session (~250ms, no full reload), which is lighter on your session. Run the same gate (job-detail predicate) after the click. The URL-navigation method in Step 3a is the reliable default; clicking is a speed optimization.
+
+---
+
 ## Step 1 — Navigate to each page
 
 Navigate to the search URL for the current page, **built from the code-words loaded in Step 0a** (substitute each `{...}` with its config value; URL-encode as needed). Pages use the `start` parameter:
@@ -111,7 +146,11 @@ Navigate to the search URL for the current page, **built from the code-words loa
 
 Page through `{pages_to_scrape}` pages total (see Step 4).
 
-Wait for the left panel job list to render before extracting. If LinkedIn shows a login page, stop and tell the user to log in first.
+Run the **page-ready gate** with this predicate before extracting (use the 15000 ms budget on page 1 - the run's first navigation - and 8000 ms on later pages):
+```javascript
+const ready = () => document.querySelectorAll('.job-card-container, [data-job-id]').length > 0;
+```
+If LinkedIn shows a login page instead, stop and tell the user to log in first.
 
 ---
 
@@ -154,9 +193,9 @@ Before running the JS, replace `{title_match_phrase}` with the lowercased config
 
 For each job ID from Step 2, follow this sequence exactly.
 
-### Rate-limit guard
+### Pacing between jobs
 
-**Before navigating to each job (except the first one), wait a random 2-4 seconds.** This prevents LinkedIn from throttling rapid back-to-back job detail requests, which causes right panels to return blank. The pause is mandatory on every run - do not skip it to save time.
+The real cause of blank/stuck right panels is **reading before the panel renders**, not request volume - so the **page-ready gate** above is the fix, not a sleep. Keep just one small human-like pause: **before navigating to each job (except the first), wait a random 1-2 seconds.** That keeps the cadence natural; the gate then waits however long the panel actually needs. Do not stack long fixed sleeps on top of the gate - it only slows the run without improving reliability.
 
 ### 3a — Load the job detail
 
@@ -167,7 +206,15 @@ Load the job via the search URL with `currentJobId`, **using the same code-words
 https://www.linkedin.com/jobs/search/?currentJobId={job_id}&f_E={seniority}&f_TPR={recency}&f_WT={work_type}&keywords={search_keywords}&location={location}
 ```
 
-After navigating, call `get_page_text`. A successful load returns the `<article>` element with the full job description starting with "About the job". If the article is missing or shows only the job list (no right panel content), the job has expired or shifted pages — skip it and move on.
+After navigating, run the **page-ready gate** with the job-detail predicate, then call `get_page_text`:
+```javascript
+const ready = () => {
+  const art = document.querySelector('article')?.innerText || '';
+  const company = document.querySelector('.job-details-jobs-unified-top-card__company-name a')?.textContent?.trim();
+  return art.includes('About the job') && !!company;
+};
+```
+On `{"ready": true}` the `<article>` holds the full description starting with "About the job" - read it with `get_page_text`. On a gate timeout, retry the navigation once; if it still times out, the job has expired or shifted pages - skip it and move on.
 
 ### 3b — Check company name and blocklist
 
@@ -176,7 +223,7 @@ Run this JS immediately after loading:
 document.querySelector('.job-details-jobs-unified-top-card__company-name a')?.textContent?.trim()
 ```
 
-If the result is `undefined` or `null`, the panel hasn't rendered — wait 3 seconds and retry once. If still undefined, skip the job.
+The gate in 3a already confirmed this node exists, so it should return the name directly. If it is somehow `undefined` (rare once the gate passed), re-run the page-ready gate once; if still undefined, skip the job.
 
 Check the company name against the aggregator blocklist. Also scan the `get_page_text` output for recruiter phrases ("currently partnered with", "on behalf of", etc.). If either match, skip this job entirely — do not create a row.
 
@@ -212,7 +259,12 @@ Get the company URL:
 document.querySelector('.job-details-jobs-unified-top-card__company-name a')?.href
 ```
 
-This returns something like `https://www.linkedin.com/company/servicetitan/life`. Strip any trailing path to get the clean slug URL: `https://www.linkedin.com/company/{slug}/`. Navigate there.
+This returns something like `https://www.linkedin.com/company/servicetitan/life`. Strip any trailing path to get the clean slug URL: `https://www.linkedin.com/company/{slug}/`. Navigate there, then run the **page-ready gate** with this company-page predicate before reading the company fields:
+```javascript
+const ready = () => !!document.querySelector('h1') &&
+  (document.querySelectorAll('.org-top-card-summary-info-list__info-item').length > 0 || /employees/i.test(document.body.innerText));
+```
+On a gate timeout, retry once; if it still times out, leave the company fields blank and continue (see edge cases).
 
 ### 3e — Extract company fields
 
@@ -322,7 +374,7 @@ After reporting the scrape results (Step 6), continue directly in the same respo
 ## Edge cases
 
 - **Login page**: Stop immediately and tell the user to log into LinkedIn in Chrome first.
-- **Right panel never loads** (undefined company, blank article): Skip that job ID and continue to the next.
+- **Right panel never loads** (the page-ready gate times out twice - once on the initial navigation, once on the retry): only then skip that job ID and continue to the next. Do not skip on a single early read - the gate exists to prevent that false negative.
 - **Job expired mid-run**: If the `currentJobId` URL loads the job list but shows no matching right panel, the job was removed — skip it.
 - **Company page returns 404 or redirect**: Leave all company fields blank, continue.
 - **No website button found**: Leave `company_website` blank, continue — do not navigate to guess the URL.
